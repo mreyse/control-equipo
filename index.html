@@ -441,11 +441,12 @@ let requests = {}, reqRef = null;
 const reqList = () => Object.entries(requests||{}).map(([id,r])=>Object.assign({id}, r));
 const REQ_COLORS = { 'Pendiente':['#fff4dc','#8a5a00'], 'Esperando compañero':['#e8f0fe','#1f4fb8'], 'Por aprobar':['#fff4dc','#8a5a00'], 'Aprobada':['#e3f6eb','#17663a'], 'Rechazada':['#fde8e8','#9b2c2c'], 'Cancelada':['#eee','#777'] };
 const reqPill = st => { const c=REQ_COLORS[st]||['#eee','#555']; return `<span class="pill" style="background:${c[0]};color:${c[1]}">${esc(st)}</span>`; };
-const reqNeedsAdmin = r => (r.kind==='vac' && r.status==='Pendiente') || (r.kind==='swap' && r.status==='Por aprobar');
-const reqIncoming = r => { const me=myMember(); return !!me && r.kind==='swap' && r.status==='Esperando compañero' && r.targetMemberId===me.id; };
+const reqNeedsAdmin = r => (r.kind==='vac' && r.status==='Pendiente') || ((r.kind==='swap'||r.kind==='gswap') && r.status==='Por aprobar');
+const reqIncoming = r => { const me=myMember(); return !!me && (r.kind==='swap'||r.kind==='gswap') && r.status==='Esperando compañero' && r.targetMemberId===me.id; };
 const reqMine = r => { const me=myMember(); return (fbUser && r.uid===fbUser.uid) || (!!me && r.memberId===me.id); };
 function reqDesc(r){
   if(r.kind==='vac') return `<b>${esc(r.type)}</b> · ${r.type===HX?`${nice(r.start)} ${r.tStart||''}–${r.tEnd||''}`:`${nice(r.start)} – ${nice(r.end)} (${businessDays(r.start,r.end)} día(s))`}${r.notes?`<br><span class="muted" style="font-size:12px">${esc(r.notes)}</span>`:''}`;
+  if(r.kind==='gswap') return `<b>🚨 ${r.targetGuardId?'Intercambio de guardia':'Cobertura de guardia'}</b> (${esc(r.team||'')}) con <b>${esc(mName(r.targetMemberId))}</b><br><span style="font-size:12px">${esc(mName(r.targetMemberId).split(' ')[0])} toma ${nice(r.myStart)} – ${nice(r.myEnd)}${r.targetGuardId?` · ${esc(mName(r.memberId).split(' ')[0])} toma ${nice(r.targetStart)} – ${nice(r.targetEnd)}`:''}</span>${r.notes?`<br><span class="muted" style="font-size:12px">${esc(r.notes)}</span>`:''}`;
   const same = r.myDate===r.targetDate;
   return `<b>🔄 Intercambio</b> con <b>${esc(mName(r.targetMemberId))}</b><br><span style="font-size:12px">${esc(mName(r.memberId).split(' ')[0])}: ${nice(r.myDate)} (${esc(r.myShiftA||'')}) ⇄ ${esc(mName(r.targetMemberId).split(' ')[0])}: ${same?'mismo día':nice(r.targetDate)} (${esc(same?(r.targetShiftA||''):(r.targetShiftB||''))})</span>${r.notes?`<br><span class="muted" style="font-size:12px">${esc(r.notes)}</span>`:''}`;
 }
@@ -465,7 +466,7 @@ function myRequestsPanel(){
   const inc = reqList().filter(reqIncoming);
   const mine = reqList().filter(reqMine).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).slice(0,10);
   return `${inc.length?`<div class="alert warn" style="margin-bottom:8px">🔄 Tienes ${inc.length} solicitud(es) de intercambio esperando tu respuesta</div>${reqRows(inc,true)}`:''}
-    <div class="toolbar" style="margin:${inc.length?'12px':'0'} 0 8px"><button class="btn sm" onclick="reqVacation()">+ Solicitar ausencia</button><button class="btn sec sm" onclick="reqSwap()">🔄 Intercambiar turno</button></div>
+    <div class="toolbar" style="margin:${inc.length?'12px':'0'} 0 8px"><button class="btn sm" onclick="reqVacation()">+ Solicitar ausencia</button>${S.rotation.order.includes(me.id)?'<button class="btn sec sm" onclick="reqSwap()">🔄 Intercambiar turno</button>':''}${me.oncall!==false?'<button class="btn sec sm" onclick="reqGuardSwap()">🚨 Intercambiar guardia</button>':''}</div>
     ${mine.length?reqRows(mine,false):'<div class="empty">Aún no has enviado solicitudes.</div>'}`;
 }
 function adminRequestsHTML(){ const list=reqList().filter(reqNeedsAdmin).sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||'')); return reqRows(list,true); }
@@ -532,6 +533,48 @@ function sendSwap(){
   const r={kind:'swap', uid:fbUser.uid, email:(fbUser.email||'').toLowerCase(), memberId:d.me, targetMemberId:d.T, targetEmail:t.email.trim().toLowerCase(), myDate:d.A, targetDate:d.B, myShiftA:d.myA, targetShiftA:d.tA, myShiftB:d.myB, targetShiftB:d.tB, notes:val('swN').trim(), status:'Esperando compañero', createdAt:todayS()};
   firebase.database().ref('requests').push(r).then(()=>{ closeModal(); toast('Solicitud enviada a '+t.name.split(' ')[0]); }).catch(e=>toast('No se pudo enviar: '+e.message));
 }
+/* ---- Intercambio de guardias ---- */
+function myFutureGuards(mid){ const t=todayS(); return S.oncall.filter(g=>g.memberId===mid && g.end>=t).sort((a,b)=>a.start.localeCompare(b.start)); }
+const gLabel = g => `${nice(g.start)} – ${nice(g.end)}`;
+function reqGuardSwap(){
+  const me=myMember(); if(!me) return toast('Tu usuario no está vinculado a un integrante');
+  const mine=myFutureGuards(me.id); if(!mine.length) return toast('No tienes guardias próximas para intercambiar');
+  openModal(`<h3>🚨 Intercambiar guardia</h3><p class="muted" style="margin-top:0">Tu compañero debe aceptar y después el administrador lo aprueba.</p>
+    <div class="form">
+      <label class="f full">Mi guardia<select id="gsMine" onchange="gsFill()">${mine.map(g=>`<option value="${g.id}">${gLabel(g)} · ${esc(g.team||'Colaboración')}</option>`).join('')}</select></label>
+      <label class="f">Compañero<select id="gsMate" onchange="gsFill(true)"></select></label>
+      <label class="f">A cambio de su guardia<select id="gsTheirs" onchange="gsPrev()"></select></label>
+      <label class="f full">Comentarios<input id="gsN" placeholder="Opcional"></label>
+    </div><div id="gsPrev"></div>
+    <div class="actions"><button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="sendGuardSwap()">Enviar a mi compañero</button></div>`);
+  gsFill();
+}
+function gsFill(keepMate){
+  const me=myMember(), g=S.oncall.find(x=>x.id===val('gsMine')); if(!g) return;
+  const team=g.team||'Colaboración', sel=document.getElementById('gsMate'), cur=sel.value;
+  if(!keepMate){
+    const mates=S.members.filter(m=>m.id!==me.id && m.oncall!==false && (m.group||'Colaboración')===team);
+    sel.innerHTML = mates.map(m=>`<option value="${m.id}" ${m.email?'':'disabled'} ${m.id===cur?'selected':''}>${esc(m.name)}${m.email?'':' (sin acceso)'}</option>`).join('');
+    if(!sel.value){ const f=[...sel.options].find(o=>!o.disabled); if(f) sel.value=f.value; }
+  }
+  const theirs=myFutureGuards(sel.value).filter(x=>(x.team||'Colaboración')===team);
+  document.getElementById('gsTheirs').innerHTML = theirs.map(x=>`<option value="${x.id}">${gLabel(x)}</option>`).join('') + `<option value="">— Solo que me cubra (sin intercambio) —</option>`;
+  gsPrev();
+}
+function gsPrev(){
+  const el=document.getElementById('gsPrev'), g=S.oncall.find(x=>x.id===val('gsMine')), T=val('gsMate'), o=S.oncall.find(x=>x.id===val('gsTheirs'));
+  if(!g||!T) return el.innerHTML='<div class="alert warn">No hay compañeros disponibles en tu equipo de guardia.</div>';
+  const tn=esc(mName(T).split(' ')[0]);
+  el.innerHTML = `<div class="alert ok">🚨 <b>${gLabel(g)}</b>: la guardia pasa a <b>${tn}</b>${o?`<br>🚨 <b>${gLabel(o)}</b>: la guardia pasa a <b>ti</b>`:'<br><span class="muted">Sin intercambio: tú no tomas ninguna guardia a cambio.</span>'}</div>`;
+}
+function sendGuardSwap(){
+  const me=myMember(), g=S.oncall.find(x=>x.id===val('gsMine')), t=member(val('gsMate')), o=S.oncall.find(x=>x.id===val('gsTheirs'));
+  if(!g||!t) return toast('Completa los datos'); if(!t.email) return toast('Tu compañero no tiene acceso vinculado');
+  const r={kind:'gswap', uid:fbUser.uid, email:(fbUser.email||'').toLowerCase(), memberId:me.id, targetMemberId:t.id, targetEmail:t.email.trim().toLowerCase(), team:g.team||'Colaboración',
+    myGuardId:g.id, myStart:g.start, myEnd:g.end, notes:val('gsN').trim(), status:'Esperando compañero', createdAt:todayS()};
+  if(o){ r.targetGuardId=o.id; r.targetStart=o.start; r.targetEnd=o.end; }
+  firebase.database().ref('requests').push(r).then(()=>{ closeModal(); toast('Solicitud enviada a '+t.name.split(' ')[0]); }).catch(e=>toast('No se pudo enviar: '+e.message));
+}
 /* ---- Acciones ---- */
 function reqAct(id, action){
   const r = Object.assign({id}, requests[id]); if(!r.kind) return;
@@ -548,6 +591,13 @@ function reqAct(id, action){
       if(r.tStart){ v.tStart=r.tStart; v.tEnd=r.tEnd; }
       const c=vacConflicts(v); if(c.length && !confirm('Esta solicitud tiene alertas:\n\n• '+c.map(x=>x.msg).join('\n• ')+'\n\n¿Aprobar de todos modos?')) return;
       S.vacations.push(v); save();
+    } else if(r.kind==='gswap'){
+      const a=S.oncall.find(g=>g.id===r.myGuardId), b=r.targetGuardId?S.oncall.find(g=>g.id===r.targetGuardId):null;
+      if(!a || a.memberId!==r.memberId || (r.targetGuardId && (!b || b.memberId!==r.targetMemberId))) return toast('Las guardias cambiaron desde que se hizo la solicitud; recházala y que la vuelvan a enviar');
+      const tn=mName(r.targetMemberId).split(' ')[0], mn=mName(r.memberId).split(' ')[0];
+      a.memberId=r.targetMemberId; a.notes=(r.targetGuardId?'Intercambio con ':'Cubre a ')+mn;
+      if(b){ b.memberId=r.memberId; b.notes='Intercambio con '+tn; }
+      save();
     } else {
       const me=r.memberId, T=r.targetMemberId, tn=mName(T).split(' ')[0], mn=mName(me).split(' ')[0];
       const swapDay = day => { const a=shiftOf(me,day), b=shiftOf(T,day);
@@ -838,6 +888,7 @@ function vacations(){
       <button class="btn" onclick="vacForm()">+ Nueva solicitud</button>
       ${!isEditor&&myMember()?'<button class="btn" onclick="reqVacation()">+ Solicitar ausencia</button>':''}
       ${myMember()&&S.rotation.order.includes(myMember().id)?'<button class="btn sec" onclick="reqSwap()">🔄 Intercambiar turno</button>':''}
+      ${myMember()&&myMember().oncall!==false?'<button class="btn sec" onclick="reqGuardSwap()">🚨 Intercambiar guardia</button>':''}
     </div></div>
   ${needTeam()}
   ${isEditor ? (()=>{ const all=reqList().sort((a,b)=>(reqNeedsAdmin(b)-reqNeedsAdmin(a)) || (b.createdAt||'').localeCompare(a.createdAt||'')).slice(0,30); return all.length?`<div class="panel"><h3>📨 Solicitudes del equipo</h3>${reqRows(all,true)}</div>`:''; })()
@@ -920,6 +971,7 @@ function oncall(){
       <select onchange="ui.gdTeam=this.value;render()"><option value="">Todos los equipos</option>${['Colaboración','MM'].map(x=>`<option ${x===ui.gdTeam?'selected':''}>${x}</option>`).join('')}</select>
       <select onchange="ui.gdMember=this.value;render()"><option value="">Todos los de guardia</option>${['Colaboración','MM'].map(gr=>{ const ms=S.members.filter(m=>m.oncall!==false && (m.group||'Colaboración')===gr && (!ui.gdTeam||ui.gdTeam===gr)); return ms.length?`<optgroup label="${gr}">${ms.map(m=>`<option value="${m.id}" ${m.id===ui.gdMember?'selected':''}>${esc(m.name)}</option>`).join('')}</optgroup>`:''; }).join('')}</select>
       <button class="btn sec" onclick="exportCSV('oncall')">⬇ CSV</button>
+      ${myMember()&&myMember().oncall!==false?'<button class="btn sec" onclick="reqGuardSwap()">🚨 Intercambiar guardia</button>':''}
       <button class="btn sec" onclick="rotationForm()">🔄 Generar rotación</button>
       <button class="btn" onclick="gdForm()">+ Guardia</button>
     </div></div>
