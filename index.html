@@ -544,8 +544,9 @@ function dashboard(){
       ${pend.length? `<table>${pend.map(v=>`<tr><td><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))}<br><span class="muted">${esc(v.type)} · ${vacWhen(v)} · ${vacDur(v)}</span></td>
         <td style="text-align:right;white-space:nowrap"><button class="btn ok sm" onclick="setStatus('${v.id}','Aprobada')">Aprobar</button> <button class="btn bad sm" onclick="setStatus('${v.id}','Rechazada')">Rechazar</button></td></tr>`).join('')}</table>` : '<div class="empty">No hay solicitudes pendientes 🎉</div>'}
     </div>
-    <div class="panel"><h3>Saldo de vacaciones ${yr}</h3>
-      ${S.members.length? `<table><tr><th>Integrante</th><th>Usados</th><th>Pend.</th><th>Disp.</th><th></th></tr>${S.members.map(m=>{ const tot=m.vacDays??S.settings.defaultDays, u=usedDays(m.id,yr), p=pendingDays(m.id,yr); return `<tr><td><span class="dot" style="background:${m.color}"></span>${esc(m.name)}</td><td>${u}</td><td>${p}</td><td><b style="color:${tot-u<0?'var(--bad)':'inherit'}">${tot-u}</b> / ${tot}</td><td><div class="bar"><i style="width:${Math.min(100,u/Math.max(tot,1)*100)}%;background:${m.color}"></i></div></td></tr>`;}).join('')}</table>` : '<div class="empty">—</div>'}
+    <div class="panel"><h3>${isEditor?'Saldo de vacaciones':'Mi saldo de vacaciones'} ${yr}</h3>
+      ${(()=>{ const rows = isEditor ? S.members : (myMember()?[myMember()]:[]); if(!isEditor && !rows.length) return `<div class="empty">Tu usuario (${esc(fbUser?.email||'')}) no está vinculado a ningún integrante.<br>Pide al administrador que registre ese correo en tu ficha de Equipo.</div>`; return ''; })()}
+      ${(isEditor ? S.members : (myMember()?[myMember()]:[])).length? `<table><tr><th>Integrante</th><th>Usados</th><th>Pend.</th><th>Disp.</th><th></th></tr>${(isEditor ? S.members : [myMember()]).map(m=>{ const tot=m.vacDays??S.settings.defaultDays, u=usedDays(m.id,yr), p=pendingDays(m.id,yr); return `<tr><td><span class="dot" style="background:${m.color}"></span>${esc(m.name)}</td><td>${u}</td><td>${p}</td><td><b style="color:${tot-u<0?'var(--bad)':'inherit'}">${tot-u}</b> / ${tot}</td><td><div class="bar"><i style="width:${Math.min(100,u/Math.max(tot,1)*100)}%;background:${m.color}"></i></div></td></tr>`;}).join('')}</table>` : ''}
     </div>
   </div>
   ${isEditor && conflicts.length?`<div class="panel"><h3>⚠️ Conflictos detectados (${conflicts.length})</h3>${conflicts.map(c=>`<div class="alert ${c.lvl}"><b>${esc(c.who)}</b> · ${esc(c.what)}<br>${esc(c.msg)}</div>`).join('')}</div>`:''}`;
@@ -1042,10 +1043,10 @@ function team(){
   return `
   <div class="head"><h2>Equipo</h2><button class="btn" onclick="memberForm()">+ Agregar integrante</button></div>
   <div class="panel">${S.members.length?`<table>
-    <tr><th>Nombre</th><th>Grupo</th><th>Puesto / rol</th><th>Contacto</th><th>Rol esta semana</th><th>Días vac. ${yr}</th><th>Participa en guardias</th><th></th></tr>
+    <tr><th>Nombre</th><th>Grupo</th><th>Puesto / rol</th><th>Contacto</th><th>Rol esta semana</th>${isEditor?`<th>Días vac. ${yr}</th><th>Acceso</th>`:''}<th>Participa en guardias</th><th></th></tr>
     ${[...S.members].sort((a,b)=>GROUPS.indexOf(a.group)-GROUPS.indexOf(b.group)).map(m=>`<tr><td><span class="dot" style="background:${m.color}"></span><b>${esc(m.name)}</b></td><td>${esc(m.group||'')}</td><td>${esc(m.role||'')}</td>
       <td class="muted">${esc(m.email||'')}${m.phone?`<br>${esc(m.phone)}`:''}</td>
-      <td>${m.shifts!==false?(positionOf(m.id,todayS())>=0?esc(S.rotation.positions[positionOf(m.id,todayS())].name):'Fuera de rotación'):(m.fixed?`Fijo ${m.fixed.start}–${m.fixed.end}`:'—')}</td><td>${usedDays(m.id,yr)} / ${m.vacDays??S.settings.defaultDays}</td><td>${m.oncall===false?'No':'Sí'}</td>
+      <td>${m.shifts!==false?(positionOf(m.id,todayS())>=0?esc(S.rotation.positions[positionOf(m.id,todayS())].name):'Fuera de rotación'):(m.fixed?`Fijo ${m.fixed.start}–${m.fixed.end}`:'—')}</td>${isEditor?`<td>${usedDays(m.id,yr)} / ${m.vacDays??S.settings.defaultDays}</td><td>${m.email?'<span title="Se vincula con el usuario de Firebase que tenga este correo">🔗 Vinculado</span>':'<span class="muted" title="Registra su correo para vincularlo">Sin correo</span>'}</td>`:''}<td>${m.oncall===false?'No':'Sí'}</td>
       <td style="text-align:right"><button class="btn sec sm" onclick="memberForm('${m.id}')">Editar</button></td></tr>`).join('')}
   </table>`:'<div class="empty">Tu equipo está vacío. Agrega a la primera persona para empezar.</div>'}</div>`;
 }
@@ -1056,7 +1057,7 @@ function memberForm(id){
       <label class="f">Nombre<input id="mName" value="${esc(m.name)}" placeholder="Nombre completo"></label>
       <label class="f">Grupo<select id="mGroup">${GROUPS.map(g=>`<option ${g===m.group?'selected':''}>${g}</option>`).join('')}</select></label>
       <label class="f">Puesto / rol<input id="mRole" value="${esc(m.role||'')}" placeholder="Ej. Ingeniero VoIP N2"></label>
-      <label class="f">Correo<input id="mEmail" value="${esc(m.email||'')}"></label>
+      <label class="f">Correo (el mismo de su acceso)<input id="mEmail" type="email" value="${esc(m.email||'')}" placeholder="correo con el que inicia sesión"></label>
       <label class="f">Teléfono<input id="mPhone" value="${esc(m.phone||'')}"></label>
       <label class="f">Días de vacaciones al año<input type="number" id="mDays" min="0" value="${m.vacDays??S.settings.defaultDays}"></label>
       <label class="f">Color<input type="color" id="mColor" value="${m.color}" style="height:36px;padding:2px"></label>
@@ -1185,6 +1186,7 @@ function doLogin(e){
   firebase.auth().signInWithEmailAndPassword(em,pw).catch(err=>{ document.getElementById('loginErr').textContent = AUTH_ERR[err.code] || err.message; });
   return false;
 }
+function myMember(){ if(!fbUser) return null; const e=(fbUser.email||'').trim().toLowerCase(); return S.members.find(m=>e && (m.email||'').trim().toLowerCase()===e) || null; }
 function roleLabel(){ return isOwner ? '👑 Propietario' : (isEditor ? '✏️ Administrador' : '👁 Solo lectura'); }
 function addEditor(){
   const uid=val('edUid').trim(), name=val('edName').trim();
@@ -1215,7 +1217,7 @@ function resetPass(){
     const applyRole = () => {
       isEditor = isOwner || !!editors[user.uid];
       document.body.classList.toggle('ro', !isEditor);
-      document.getElementById('whoami').innerHTML = `${esc(user.email)}<br><b>${roleLabel()}</b>`;
+      document.getElementById('whoami').innerHTML = `${myMember()?`<b>${esc(myMember().name)}</b><br>`:''}${esc(user.email)}<br><b>${roleLabel()}</b>`;
     };
     applyRole();
     hideLogin(); setSync('Conectando…');
