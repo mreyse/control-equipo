@@ -421,7 +421,6 @@ function dashboard(){
     <div class="kpi"><div class="n">${offToday.length}</div><div class="l">Ausentes hoy</div>${offToday.length?`<div style="margin-top:6px;font-size:13px">${offToday.map(v=>`<div><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))} <span class="muted" style="font-size:11px">(${esc(v.type)}${v.end>t?` · hasta ${nice(v.end)}`:''})</span></div>`).join('')}</div>`:''}</div>
     <div class="kpi"><div class="n" style="font-size:16px;padding-top:6px">${gdToday.length?gdToday.map(g=>`<span class="dot" style="background:${mColor(g.memberId)}"></span>${esc(mName(g.memberId))} <span class="muted" style="font-size:12px">(${esc(g.team||g.type)})</span>`).join('<br>'):'<span class="muted">Sin asignar</span>'}</div><div class="l">De guardia hoy</div></div>
   </div>
-  ${isEditor && conflicts.length?`<div class="panel"><h3>⚠️ Conflictos detectados (${conflicts.length})</h3>${conflicts.map(c=>`<div class="alert ${c.lvl}"><b>${esc(c.who)}</b> · ${esc(c.what)}<br>${esc(c.msg)}</div>`).join('')}</div>`:''}
   ${(()=>{ const h=holidayOn(t); const nx=[...holidaysOfYear(+t.slice(0,4)),...holidaysOfYear(+t.slice(0,4)+1)].find(x=>x.date>t);
      return h ? `<div class="alert bad" style="font-size:14px">🎉 <b>Hoy es día festivo:</b> ${esc(h.name)}</div>` : (nx?`<div class="alert ok">🎉 Próximo día festivo: <b>${esc(nx.name)}</b> · ${DAYS[dow(pd(nx.date))]} ${nice(nx.date)}</div>`:''); })()}
   <div class="panel"><h3>Turnos de hoy</h3><div class="toolbar">${COVER.map(r=>{ const who=S.members.filter(m=>shiftOf(m.id,t)===r && !offOn(t).some(v=>v.memberId===m.id)); return `<span class="shift" style="background:${SHIFT_COLORS[r]};color:var(--ink);padding:6px 10px"><b>${r}:</b> ${who.length?who.map(m=>esc(m.name)).join(', '):'<span style="color:var(--bad)">sin cubrir / no aplica</span>'}</span>`; }).join('')}</div></div>
@@ -439,7 +438,8 @@ function dashboard(){
     <div class="panel"><h3>Saldo de vacaciones ${yr}</h3>
       ${S.members.length? `<table><tr><th>Integrante</th><th>Usados</th><th>Pend.</th><th>Disp.</th><th></th></tr>${S.members.map(m=>{ const tot=m.vacDays??S.settings.defaultDays, u=usedDays(m.id,yr), p=pendingDays(m.id,yr); return `<tr><td><span class="dot" style="background:${m.color}"></span>${esc(m.name)}</td><td>${u}</td><td>${p}</td><td><b style="color:${tot-u<0?'var(--bad)':'inherit'}">${tot-u}</b> / ${tot}</td><td><div class="bar"><i style="width:${Math.min(100,u/Math.max(tot,1)*100)}%;background:${m.color}"></i></div></td></tr>`;}).join('')}</table>` : '<div class="empty">—</div>'}
     </div>
-  </div>`;
+  </div>
+  ${isEditor && conflicts.length?`<div class="panel"><h3>⚠️ Conflictos detectados (${conflicts.length})</h3>${conflicts.map(c=>`<div class="alert ${c.lvl}"><b>${esc(c.who)}</b> · ${esc(c.what)}<br>${esc(c.msg)}</div>`).join('')}</div>`:''}`;
 }
 
 /* ================== Vista: Calendario ================== */
