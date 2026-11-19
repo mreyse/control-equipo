@@ -214,7 +214,8 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "888997084251",
   appId: "1:888997084251:web:b7007333d64820498f537e"
 };
-const EDITOR_UID = "OjirKqjwMNX1xhXs6o3Ww23WsBH2";
+const EDITOR_UID = "OjirKqjwMNX1xhXs6o3Ww23WsBH2"; // propietario
+let editors = {}, edRef = null, isOwner = false;
 const DB_PATH = 'controlEquipo';
 let lastRemote = null, fbUser = null, isEditor = false, dbRef = null, applyingRemote = false;
 /* ================== Datos y almacenamiento ================== */
@@ -850,11 +851,19 @@ function delMember(id){
 
 /* ================== Vista: Ajustes ================== */
 function settings(){
-  const session = `<div class="panel"><h3>Sesión</h3><p style="margin-top:0">${fbUser?`${esc(fbUser.email)} · <b>${isEditor?'✏️ Editor':'👁 Solo lectura'}</b>`:'Sin sesión'}</p><button class="btn sec" onclick="doLogout()">Cerrar sesión</button></div>`;
+  const session = `<div class="panel"><h3>Sesión</h3><p style="margin-top:0">${fbUser?`${esc(fbUser.email)} · <b>${roleLabel()}</b>`:'Sin sesión'}</p><button class="btn sec" onclick="doLogout()">Cerrar sesión</button></div>`;
   if(!isEditor) return `<div class="head"><h2>Ajustes</h2></div>${session}`;
   return `
   <div class="head"><h2>Ajustes</h2></div>
   ${session}
+  ${isOwner?`<div class="panel"><h3>👑 Administradores</h3>
+    <p class="muted" style="margin-top:0">Los administradores pueden editar todo. Solo tú (propietario) puedes agregarlos o quitarlos. El UID está en Firebase → Authentication → Usuarios.</p>
+    ${Object.keys(editors).length?`<table><tr><th>Nombre</th><th>UID</th><th>Desde</th><th></th></tr>${Object.entries(editors).map(([u,e])=>`<tr><td>${esc(e.name||'')}</td><td class="muted" style="font-size:12px">${esc(u)}</td><td class="muted">${nice(e.addedAt||'')}</td><td style="text-align:right"><button class="btn bad sm" onclick="delEditor('${esc(u)}')">Quitar</button></td></tr>`).join('')}</table>`:'<p class="muted">Aún no hay administradores adicionales.</p>'}
+    <div class="toolbar" style="margin-top:10px">
+      <input id="edName" placeholder="Nombre (ej. Elías Aguilar)" style="flex:1;min-width:160px">
+      <input id="edUid" placeholder="UID del usuario" style="flex:2;min-width:220px">
+      <button class="btn" onclick="addEditor()">+ Agregar administrador</button>
+    </div></div>`:''}
   <div class="panel"><h3>Reglas</h3>
     <div class="form" style="max-width:600px">
       <label class="f">Máximo de personas ausentes el mismo día<input type="number" min="1" value="${S.settings.maxOff}" onchange="S.settings.maxOff=Math.max(1,+this.value);save();toast('Guardado')"></label>
@@ -917,7 +926,19 @@ function doLogin(e){
   firebase.auth().signInWithEmailAndPassword(em,pw).catch(err=>{ document.getElementById('loginErr').textContent = AUTH_ERR[err.code] || err.message; });
   return false;
 }
-function doLogout(){ if(dbRef) dbRef.off(); dbRef=null; firebase.auth().signOut(); }
+function roleLabel(){ return isOwner ? '👑 Propietario' : (isEditor ? '✏️ Administrador' : '👁 Solo lectura'); }
+function addEditor(){
+  const uid=val('edUid').trim(), name=val('edName').trim();
+  if(!uid) return toast('Pega el UID del usuario');
+  if(/[.#$\[\]\/]/.test(uid)) return toast('El UID no es válido');
+  if(uid===EDITOR_UID) return toast('Ese UID es el del propietario');
+  firebase.database().ref('editors/'+uid).set({name:name||uid, addedAt:todayS()}).then(()=>toast('Administrador agregado')).catch(e=>toast('No se pudo agregar: '+e.message));
+}
+function delEditor(uid){
+  if(!confirm('¿Quitar permisos de administrador a '+(editors[uid]?.name||uid)+'?')) return;
+  firebase.database().ref('editors/'+uid).remove().then(()=>toast('Permisos retirados')).catch(e=>toast('No se pudo quitar: '+e.message));
+}
+function doLogout(){ if(dbRef) dbRef.off(); dbRef=null; if(edRef) edRef.off(); edRef=null; editors={}; firebase.auth().signOut(); }
 function resetPass(){
   const em=document.getElementById('lEmail').value.trim(); if(!em) return document.getElementById('loginErr').textContent='Escribe tu correo arriba y vuelve a dar clic.';
   firebase.auth().sendPasswordResetEmail(em).then(()=>document.getElementById('loginErr').textContent='Te enviamos un correo para cambiar la contraseña.').catch(err=>document.getElementById('loginErr').textContent=AUTH_ERR[err.code]||err.message);
@@ -931,10 +952,16 @@ function resetPass(){
   auth.onAuthStateChanged(user=>{
     fbUser = user;
     if(!user){ isEditor=false; document.body.classList.remove('ro'); showLogin(''); return; }
-    isEditor = user.uid === EDITOR_UID;
-    document.body.classList.toggle('ro', !isEditor);
-    document.getElementById('whoami').innerHTML = `${esc(user.email)}<br><b>${isEditor?'✏️ Editor':'👁 Solo lectura'}</b>`;
+    isOwner = user.uid === EDITOR_UID;
+    const applyRole = () => {
+      isEditor = isOwner || !!editors[user.uid];
+      document.body.classList.toggle('ro', !isEditor);
+      document.getElementById('whoami').innerHTML = `${esc(user.email)}<br><b>${roleLabel()}</b>`;
+    };
+    applyRole();
     hideLogin(); setSync('Conectando…');
+    edRef = firebase.database().ref('editors');
+    edRef.on('value', snap=>{ editors = snap.val()||{}; const was=isEditor; applyRole(); if(was!==isEditor || ui.view==='settings') render(); }, ()=>{ editors={}; applyRole(); });
     dbRef = firebase.database().ref(DB_PATH);
     dbRef.on('value', snap=>{
       const v = snap.val();
