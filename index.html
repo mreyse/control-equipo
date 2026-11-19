@@ -173,7 +173,7 @@ body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
     <div class="spacer"></div>
     <div class="userbox"><div id="whoami"></div><div id="syncState" style="margin-top:4px">—</div><button onclick="doLogout()">Cerrar sesión</button></div>
     <div class="tools">
-      <button onclick="exportJSON()">⬇ Respaldar datos (JSON)</button>
+      <button class="edit-only" onclick="exportJSON()">⬇ Respaldar datos (JSON)</button>
       <button class="edit-only" onclick="document.getElementById('importFile').click()">⬆ Restaurar respaldo</button>
       <input type="file" id="importFile" accept=".json" class="hidden" onchange="importJSON(event)">
     </div>
@@ -823,22 +823,23 @@ function delMember(id){
 
 /* ================== Vista: Ajustes ================== */
 function settings(){
+  const session = `<div class="panel"><h3>Sesión</h3><p style="margin-top:0">${fbUser?`${esc(fbUser.email)} · <b>${isEditor?'✏️ Editor':'👁 Solo lectura'}</b>`:'Sin sesión'}</p><button class="btn sec" onclick="doLogout()">Cerrar sesión</button></div>`;
+  if(!isEditor) return `<div class="head"><h2>Ajustes</h2></div>${session}`;
   return `
   <div class="head"><h2>Ajustes</h2></div>
-  <div class="panel"><h3>Sesión</h3><p style="margin-top:0">${fbUser?`${esc(fbUser.email)} · <b>${isEditor?'✏️ Editor':'👁 Solo lectura'}</b>`:'Sin sesión'}</p><button class="btn sec" onclick="doLogout()">Cerrar sesión</button></div>
-  <div class="panel"><h3>Reglas</h3>${isEditor?'':'<div class="alert warn">🔒 Solo el editor puede modificar estos valores.</div>'}
+  ${session}
+  <div class="panel"><h3>Reglas</h3>
     <div class="form" style="max-width:600px">
-      <label class="f">Máximo de personas ausentes el mismo día<input type="number" min="1" value="${S.settings.maxOff}" ${isEditor?"":"disabled"} onchange="S.settings.maxOff=Math.max(1,+this.value);save();toast('Guardado')"></label>
-      <label class="f">Días de vacaciones por defecto (nuevos integrantes)<input type="number" min="0" value="${S.settings.defaultDays}" ${isEditor?"":"disabled"} onchange="S.settings.defaultDays=+this.value;save();toast('Guardado')"></label>
+      <label class="f">Máximo de personas ausentes el mismo día<input type="number" min="1" value="${S.settings.maxOff}" onchange="S.settings.maxOff=Math.max(1,+this.value);save();toast('Guardado')"></label>
+      <label class="f">Días de vacaciones por defecto (nuevos integrantes)<input type="number" min="0" value="${S.settings.defaultDays}" onchange="S.settings.defaultDays=+this.value;save();toast('Guardado')"></label>
     </div></div>
   <div class="panel"><h3>Datos</h3>
-    <p class="muted">La información se guarda <b>solo en este navegador y en esta computadora</b>. Si borras el historial/datos del navegador o cambias de navegador, se pierde, así que haz un respaldo JSON con regularidad.</p>
+    <p class="muted">La información se guarda en la nube (Firebase) y se sincroniza en todos los dispositivos. Aun así, conviene descargar un respaldo JSON de vez en cuando.</p>
     <div class="toolbar">
       <button class="btn" onclick="exportJSON()">⬇ Respaldar (JSON)</button>
       <button class="btn sec" onclick="document.getElementById('importFile').click()">⬆ Restaurar respaldo</button>
       <button class="btn sec" onclick="exportCSV('vacations')">⬇ Vacaciones CSV</button>
       <button class="btn sec" onclick="exportCSV('oncall')">⬇ Guardias CSV</button>
-
     </div>
     <p class="muted" style="font-size:12px;margin-top:12px">Registros: ${S.members.length} integrantes · ${S.oncall.length} guardias · ${S.vacations.length} solicitudes</p>
   </div>`;
