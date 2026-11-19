@@ -474,9 +474,17 @@ function coverChips(s){
     return `<span class="chip cv" style="border-left-color:${COVER_LINE[r]}" title="${r}"><b>${r}:</b> ${list.length?list.map(m=>esc(m.name.split(' ')[0])).join(', '):'<span style="color:var(--bad)">sin cubrir</span>'}</span>`; }).join('');
 }
 function chipsFull(s, D, compact){
+  const vacIcon = v => v.status==='Pendiente' ? '⏳' : '🌴';
+  const merged = new Set();
+  const gChips = D.gds.map(g=>{
+    const v = D.vacs.find(x=>x.memberId===g.memberId);
+    if(v){ merged.add(v.id);
+      return `<span class="chip gd" style="border-color:${mColor(g.memberId)}" title="Guardia ${esc(g.team||'')} + ${esc(v.type)} (${v.status})" onclick="vacForm('${v.id}')">🚨${vacIcon(v)} ${compact?'':'Guardia '+esc(g.team||'')+' · '+esc(v.type)+(v.status==='Pendiente'?' (pendiente)':'')+': '}${esc(mName(g.memberId))}</span>`; }
+    return `<span class="chip gd" style="border-color:${mColor(g.memberId)}" title="Guardia ${esc(g.team||'')}">🚨 ${compact?'':'Guardia '+esc(g.team||'')+': '}${esc(mName(g.memberId))}</span>`;
+  }).join('');
   return `${D.hol?`<span class="chip holc">🎉 ${esc(D.hol.name)}</span>`:''}
-    ${D.gds.map(g=>`<span class="chip gd" style="border-color:${mColor(g.memberId)}" title="Guardia ${esc(g.team||'')}">🚨 ${compact?'':'Guardia '+esc(g.team||'')+': '}${esc(mName(g.memberId))}</span>`).join('')}
-    ${D.vacs.map(v=>`<span class="chip vac ${v.status==='Pendiente'?'vpend':''}" style="border-left-color:${mColor(v.memberId)}" title="${esc(v.type)} (${v.status})" onclick="vacForm('${v.id}')">${v.status==='Pendiente'?'⏳ ':'🌴 '}${esc(mName(v.memberId))}${compact?'':' · '+esc(v.type)+(v.status==='Pendiente'?' (pendiente)':'')}</span>`).join('')}
+    ${gChips}
+    ${D.vacs.filter(v=>!merged.has(v.id)).map(v=>`<span class="chip vac ${v.status==='Pendiente'?'vpend':''}" style="border-left-color:${mColor(v.memberId)}" title="${esc(v.type)} (${v.status})" onclick="vacForm('${v.id}')">${vacIcon(v)} ${esc(mName(v.memberId))}${compact?'':' · '+esc(v.type)+(v.status==='Pendiente'?' (pendiente)':'')}</span>`).join('')}
     ${D.hxs.map(v=>`<span class="chip hx ${v.status==='Pendiente'?'pend':''}" style="border-color:${mColor(v.memberId)}" title="${HX} (${v.status})" onclick="vacForm('${v.id}')">⏱ ${esc(mName(v.memberId))} ${v.tStart||''}–${v.tEnd||''}</span>`).join('')}`;
 }
 function coverageHTML(s, full){
