@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Control de Equipo · Horarios, Guardias y Vacaciones</title>
+<style>
+:root{
+  --bg:#f4f6f9;--panel:#fff;--ink:#1d2433;--muted:#6b7385;--line:#e3e7ee;
+  --side:#18202f;--side-ink:#c9d1e0;--accent:#2f6fed;--accent-soft:#e8f0fe;
+  --ok:#1f9d55;--ok-soft:#e3f6eb;--warn:#d98a00;--warn-soft:#fff4dc;--bad:#d64545;--bad-soft:#fde8e8;
+  --radius:10px;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+.app{display:flex;min-height:100vh}
+aside{width:220px;background:var(--side);color:var(--side-ink);padding:20px 12px;flex-shrink:0;display:flex;flex-direction:column;gap:4px}
+aside h1{font-size:15px;color:#fff;margin:0 8px 18px;line-height:1.3}
+aside h1 small{display:block;font-weight:400;color:#8b95a8;font-size:12px}
+.nav{background:none;border:0;color:var(--side-ink);text-align:left;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:14px;display:flex;gap:10px;align-items:center}
+.nav:hover{background:#243047}
+.nav.active{background:var(--accent);color:#fff}
+.nav .badge{margin-left:auto;background:var(--warn);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px}
+aside .spacer{flex:1}
+aside .tools{display:flex;flex-direction:column;gap:6px;padding:0 4px}
+aside .tools button{background:#243047;color:var(--side-ink);border:0;border-radius:6px;padding:8px;cursor:pointer;font-size:12px}
+aside .tools button:hover{background:#2e3c58}
+main{flex:1;padding:24px 28px;overflow:auto}
+.head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap}
+.head h2{margin:0;font-size:20px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.panel h3{margin:0 0 12px;font-size:15px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+.kpi .n{font-size:26px;font-weight:700}
+.kpi .l{color:var(--muted);font-size:12px}
+button.btn{background:var(--accent);color:#fff;border:0;border-radius:7px;padding:8px 14px;cursor:pointer;font-size:13px}
+button.btn:hover{filter:brightness(1.08)}
+button.btn.sec{background:#eef1f6;color:var(--ink)}
+button.btn.ok{background:var(--ok)}
+button.btn.bad{background:var(--bad)}
+button.sm{padding:4px 9px;font-size:12px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+tr:last-child td{border-bottom:0}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:middle}
+.pill{display:inline-block;padding:2px 9px;border-radius:12px;font-size:12px;font-weight:600}
+.pill.Pendiente{background:var(--warn-soft);color:var(--warn)}
+.pill.Aprobada{background:var(--ok-soft);color:var(--ok)}
+.pill.Rechazada{background:var(--bad-soft);color:var(--bad)}
+.pill.Cancelada{background:#eee;color:#777}
+.muted{color:var(--muted)}
+.empty{color:var(--muted);text-align:center;padding:20px}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+select,input,textarea{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}
+textarea{resize:vertical;min-height:60px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form .full{grid-column:1/-1}
+.alert{padding:9px 12px;border-radius:7px;margin:6px 0;font-size:13px}
+.alert.warn{background:var(--warn-soft);color:#8a5a00}
+.alert.bad{background:var(--bad-soft);color:#9b2c2c}
+.alert.ok{background:var(--ok-soft);color:#17663a}
+/* Calendario */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.cal .dh{background:#f8f9fb;padding:8px;font-size:12px;font-weight:600;color:var(--muted);text-align:center}
+.cal .d{background:#fff;min-height:105px;padding:6px;font-size:12px}
+.cal .d.out{background:#fafbfc;color:#b5bccb}
+.cal .d.today{box-shadow:inset 0 0 0 2px var(--accent)}
+.cal .d.we{background:#fbfcfe}
+.cal .num{font-weight:600;margin-bottom:4px;display:flex;justify-content:space-between}
+.cal .num .off{color:var(--bad);font-weight:600}
+.chip{display:block;border-radius:4px;padding:2px 5px;margin-bottom:2px;color:#fff;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip.pend{background:#fff!important;border:1.5px dashed;color:var(--ink)}
+.chip.hx{color:var(--ink);background:#f3ecff!important;border-left:4px solid}
+.chip.gd{color:var(--ink);background:#fff!important;border-left:4px solid}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:10px}
+.legend span{display:flex;align-items:center;gap:6px}
+.sw{width:18px;height:11px;border-radius:3px;display:inline-block}
+/* Horarios semanales */
+.week td,.week th{text-align:center}
+.week td:first-child,.week th:first-child{text-align:left}
+.shift{font-size:12px;background:var(--accent-soft);color:#1f4fb8;border-radius:5px;padding:3px 6px;display:inline-block}
+.shift.off{background:#f1f2f5;color:#99a0ae}
+.shift.vac{background:var(--ok-soft);color:var(--ok)}
+.shift.gd{background:var(--warn-soft);color:#8a5a00}
+.week input[type=time]{width:88px;padding:4px}
+table.xl th,table.xl td{border:1px solid #c9ced8;text-align:center;padding:6px 8px;font-size:13px}
+table.xl th{background:#1f3864;color:#fff;text-transform:none;letter-spacing:0}
+table.xl td.role{font-weight:600;text-align:left}
+table.xl td.eng{text-align:left;white-space:nowrap}
+table.xl td.sc{cursor:pointer;min-width:92px}
+table.xl td.sc:hover{outline:2px solid var(--accent);outline-offset:-2px}
+table.xl td.tday{box-shadow:inset 0 0 0 2px var(--accent)}
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(15,20,30,.45);display:none;align-items:center;justify-content:center;z-index:50}
+.modal-bg.show{display:flex}
+.modal{background:#fff;border-radius:12px;width:min(560px,94vw);max-height:90vh;overflow:auto;padding:20px}
+.modal h3{margin:0 0 14px}
+.modal .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--side);color:#fff;padding:10px 16px;border-radius:8px;opacity:0;transition:.25s;pointer-events:none;z-index:60}
+.toast.show{opacity:1}
+.bar{height:7px;background:#eef1f6;border-radius:5px;overflow:hidden;min-width:90px}
+.bar i{display:block;height:100%;background:var(--accent)}
+.hidden{display:none!important}
+@media(max-width:900px){.grid4{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}aside{width:64px}aside h1,aside .tools,.nav .t{display:none}}
+#login{position:fixed;inset:0;background:var(--side);display:none;align-items:center;justify-content:center;z-index:100}
+#login.show{display:flex}
+#login .lbox{background:#fff;border-radius:12px;padding:28px;width:min(360px,92vw);display:flex;flex-direction:column;gap:12px}
+#login h2{margin:0}
+body.locked .app{filter:blur(6px);pointer-events:none}
+.userbox{font-size:12px;color:#8b95a8;padding:10px 8px;border-top:1px solid #2a3550;margin-bottom:8px}
+.userbox #whoami{color:var(--side-ink);word-break:break-all}
+.userbox button{margin-top:6px;background:none;border:1px solid #3a4766;color:var(--side-ink);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px}
+body.ro .edit-only,
+body.ro button[onclick*="Form("],body.ro button[onclick*="setStatus"],body.ro button[onclick*="loadDemo"],body.ro button[onclick*="resetAll"],body.ro button[onclick*="importFile"]{display:none!important}
+body.ro td[onclick*="cellEdit"],body.ro .chip[onclick]{pointer-events:none;cursor:default}
+body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
+@media print{aside,.toolbar,button{display:none!important}main{padding:0}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>Control de Equipo<small>Horarios · Guardias · Vacaciones</small></h1>
+    <button class="nav active" data-view="dashboard">📊 <span class="t">Resumen</span></button>
+    <button class="nav" data-view="calendar">📅 <span class="t">Calendario</span></button>
+    <button class="nav" data-view="vacations">🌴 <span class="t">Vacaciones / Ausencias</span><span class="badge hidden" id="pendBadge">0</span></button>
+    <button class="nav" data-view="oncall">🚨 <span class="t">Guardias</span></button>
+    <button class="nav" data-view="schedules">🕘 <span class="t">Horarios</span></button>
+    <button class="nav" data-view="team">👥 <span class="t">Equipo</span></button>
+    <button class="nav" data-view="settings">⚙️ <span class="t">Ajustes</span></button>
+    <div class="spacer"></div>
+    <div class="userbox"><div id="whoami"></div><div id="syncState" style="margin-top:4px">—</div><button onclick="doLogout()">Cerrar sesión</button></div>
+    <div class="tools">
+      <button onclick="exportJSON()">⬇ Respaldar datos (JSON)</button>
+      <button class="edit-only" onclick="document.getElementById('importFile').click()">⬆ Restaurar respaldo</button>
+      <input type="file" id="importFile" accept=".json" class="hidden" onchange="importJSON(event)">
+    </div>
+  </aside>
+  <main id="main"></main>
+</div>
+
+<div id="login"><form class="lbox" onsubmit="return doLogin(event)">
+  <h2>Control de Equipo</h2><p class="muted" style="margin-top:0">Servicios de Colaboración · inicia sesión</p>
+  <label class="f">Correo<input id="lEmail" type="email" autocomplete="username" required></label>
+  <label class="f">Contraseña<input id="lPass" type="password" autocomplete="current-password" required></label>
+  <button class="btn" style="width:100%;padding:10px">Entrar</button>
+  <div id="loginErr" class="muted" style="min-height:18px;margin-top:10px;color:var(--bad)"></div>
+  <a href="#" onclick="resetPass();return false" style="font-size:12px;color:var(--accent)">¿Olvidaste tu contraseña?</a>
+</form></div>
+<div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script>
+/* ================== Firebase ================== */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyB80vbKo1toLgHhGYatgT4Z9ZrLfbQLR28",
+  authDomain: "control-equipo-e46f2.firebaseapp.com",
+  databaseURL: "https://control-equipo-e46f2-default-rtdb.firebaseio.com",
+  projectId: "control-equipo-e46f2",
+  storageBucket: "control-equipo-e46f2.firebasestorage.app",
+  messagingSenderId: "888997084251",
+  appId: "1:888997084251:web:b7007333d64820498f537e"
+};
+const EDITOR_UID = "OjirKqjwMNX1xhXs6o3Ww23WsBH2";
+const DB_PATH = 'controlEquipo';
+let lastRemote = null, fbUser = null, isEditor = false, dbRef = null, applyingRemote = false;
+/* ================== Datos y almacenamiento ================== */
+const KEY = 'controlEquipo.v2';
+const GROUPS = ['Colaboración','MM','Desarrollo'];
+const DAYS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const COLORS = ['#2f6fed','#1f9d55','#d64545','#8e44ad','#d98a00','#16a2b8','#e0567a','#5d6d7e','#27ae60','#c0392b'];
+const HX = 'Horas extras a cambiar';
+const VAC_TYPES = ['Vacaciones','Incapacidad',HX,'Día personal','Permiso','Día compensatorio','Otro'];
+const GD_TYPES = ['Primaria','Secundaria','Respaldo'];
+
+let S;
+let ui = { view:'dashboard', calY:new Date().getFullYear(), calM:new Date().getMonth(), calMember:'', calGuards:true, vacFilter:'Todas', vacMember:'', gdMember:'' };
+
+function blank(){
+  return { members:[], oncall:[], vacations:[], settings:{ maxOff:2, defaultDays:18 },
+    rotation:{ anchor:'2026-11-09', order:[], positions:[], overrides:{}, breaks:[],
+      hours:{ 'Mañana':{start:'07:00',end:'16:00'}, 'Mutante':{start:'10:00',end:'19:00'}, 'Tarde':{start:'13:00',end:'22:00'}, 'Oficina':{start:'09:00',end:'18:00'}, 'Home office':{start:'09:00',end:'18:00'} } } };
+}
+function seedTeam(st){ return st; } // Los datos del equipo viven en Firebase, no en el código
+const toArr = v => Array.isArray(v) ? v.filter(x=>x!=null) : (v ? Object.values(v) : []);
+function hydrate(d){
+  const b = blank();
+  const x = Object.assign(b, d, {settings:Object.assign(b.settings, d.settings||{}), rotation:Object.assign(blank().rotation, d.rotation||{})});
+  x.members = toArr(x.members).map(m=>Object.assign({}, m, {fixed: m.fixed ? Object.assign({}, m.fixed, {days: toArr(m.fixed.days)}) : null}));
+  x.oncall = toArr(x.oncall); x.vacations = toArr(x.vacations);
+  const R = x.rotation;
+  R.order = toArr(R.order); R.breaks = toArr(R.breaks); R.overrides = R.overrides || {};
+  R.positions = toArr(R.positions).map(p=>Object.assign({}, p, {days: toArr(p.days)}));
+  R.hours = Object.assign(blank().rotation.hours, R.hours||{});
+  return x;
+}
+function load(){
+  try{ const r = localStorage.getItem(KEY); if(r) return hydrate(JSON.parse(r)); }catch(e){}
+  return seedTeam(blank());
+}
+function save(){
+  rotCache = new Map();
+  try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
+  renderBadge();
+  if(applyingRemote || !dbRef) return;
+  if(!isEditor){ if(lastRemote){ S = hydrate(lastRemote); rotCache = new Map(); } closeModal(); render(); toast('🔒 Modo solo lectura: no puedes hacer cambios'); return; }
+  setSync('Guardando…');
+  dbRef.set(JSON.parse(JSON.stringify(S))).then(()=>setSync('✓ Sincronizado')).catch(e=>{ setSync('⚠ Error al guardar'); toast('No se pudo guardar en la nube: '+e.message); });
+}
+const uid = () => Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4);
+
+/* ================== Utilidades de fechas ================== */
+const pd = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y,m-1,d); };
+const fd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const todayS = () => fd(new Date());
+const nice = s => { if(!s) return ''; const d = pd(s); return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3)} ${d.getFullYear()}`; };
+const dow = d => (d.getDay()+6)%7; // 0 = lunes
+function eachDay(a,b,fn){ const d = pd(a), e = pd(b); while(d<=e){ fn(fd(d), new Date(d)); d.setDate(d.getDate()+1); } }
+function businessDays(a,b){ let n=0; eachDay(a,b,(s,d)=>{ if(dow(d)<5) n++; }); return n; }
+const overlaps = (a1,b1,a2,b2) => a1<=b2 && a2<=b1;
+const inRange = (s,a,b) => s>=a && s<=b;
+
+const member = id => S.members.find(m=>m.id===id);
+const mName = id => member(id)?.name || '(eliminado)';
+const mColor = id => member(id)?.color || '#999';
+const esc = s => String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function usedDays(mid, year){
+  return S.vacations.filter(v=>v.memberId===mid && v.status==='Aprobada' && v.type==='Vacaciones' && v.start.slice(0,4)==String(year))
+    .reduce((t,v)=>t+businessDays(v.start,v.end),0);
+}
+function pendingDays(mid, year){
+  return S.vacations.filter(v=>v.memberId===mid && v.status==='Pendiente' && v.type==='Vacaciones' && v.start.slice(0,4)==String(year))
+    .reduce((t,v)=>t+businessDays(v.start,v.end),0);
+}
+const isHX = v => v.type===HX;
+const hxHours = v => (v.tStart&&v.tEnd) ? hoursBetween(v.tStart,v.tEnd) : 0;
+const fmtH = h => (Math.round(h*100)/100).toString().replace('.',',')+' h';
+function vacDur(v){ return isHX(v) ? fmtH(hxHours(v)) : businessDays(v.start,v.end)+' día(s)'; }
+function vacWhen(v){ return isHX(v) ? `${nice(v.start)} · ${v.tStart||''}–${v.tEnd||''}` : `${nice(v.start)} – ${nice(v.end)}`; }
+function groupFilter(sel, mid){ if(!sel) return true; if(sel.startsWith('g:')) return (member(mid)?.group||'')===sel.slice(2); return mid===sel; }
+function groupMemberOptions(sel){ return `<option value="">Todo el equipo</option><optgroup label="Grupos">${GROUPS.map(g=>`<option value="g:${g}" ${sel==='g:'+g?'selected':''}>${g}</option>`).join('')}</optgroup><optgroup label="Integrantes">${S.members.map(m=>`<option value="${m.id}" ${m.id===sel?'selected':''}>${esc(m.name)}</option>`).join('')}</optgroup>`; }
+function offOn(dateS, includePending=false){
+  return S.vacations.filter(v=>!isHX(v) && (v.status==='Aprobada' || (includePending && v.status==='Pendiente')) && inRange(dateS,v.start,v.end));
+}
+function guardOn(dateS){ return S.oncall.filter(g=>inRange(dateS,g.start,g.end)); }
+
+/* Conflictos de una solicitud de vacaciones */
+function vacConflicts(v){
+  const out = [];
+  if(isHX(v)) return out;
+  const gds = S.oncall.filter(g=>g.memberId===v.memberId && overlaps(g.start,g.end,v.start,v.end));
+  gds.forEach(g=>out.push({lvl:'bad', msg:`Tiene guardia ${g.type.toLowerCase()} del ${nice(g.start)} al ${nice(g.end)}.`}));
+  const days = [];
+  eachDay(v.start, v.end, s=>{
+    const others = offOn(s).filter(o=>o.id!==v.id && o.memberId!==v.memberId);
+    if(others.length+1 > S.settings.maxOff) days.push(s);
+  });
+  if(days.length) out.push({lvl:'warn', msg:`Supera el máximo de ${S.settings.maxOff} persona(s) ausentes en ${days.length} día(s): ${days.slice(0,4).map(nice).join(', ')}${days.length>4?'…':''}`});
+  const unc = []; eachDay(v.start, v.end, s=>{ const r=roleShift(v.memberId,s); if(COVER.includes(r)) unc.push(`${DAYS[dow(pd(s))]} ${nice(s)} (${r})`); });
+  if(unc.length) out.push({lvl:'warn', msg:`Su turno queda sin cubrir: ${unc.slice(0,4).join(', ')}${unc.length>4?'…':''}. Define quién lo cubre en Horarios.`});
+  const dup = S.vacations.filter(o=>o.id!==v.id && o.memberId===v.memberId && ['Aprobada','Pendiente'].includes(o.status) && overlaps(o.start,o.end,v.start,v.end));
+  if(dup.length) out.push({lvl:'warn', msg:'Se empalma con otra solicitud de la misma persona.'});
+  const m = member(v.memberId);
+  if(m && v.type==='Vacaciones'){
+    const yr = v.start.slice(0,4);
+    const used = usedDays(m.id, yr) - (v.status==='Aprobada'?businessDays(v.start,v.end):0);
+    const after = used + businessDays(v.start,v.end);
+    if(after > (m.vacDays ?? S.settings.defaultDays)) out.push({lvl:'warn', msg:`Excede su saldo anual (${after} de ${m.vacDays ?? S.settings.defaultDays} días).`});
+  }
+  return out;
+}
+/* Conflictos de una guardia */
+function gdConflicts(g){
+  const out = [];
+  S.vacations.filter(v=>v.memberId===g.memberId && v.status==='Aprobada' && overlaps(v.start,v.end,g.start,g.end))
+    .forEach(v=>out.push({lvl:'bad', msg:`${mName(g.memberId)} tiene ${v.type.toLowerCase()} aprobadas del ${nice(v.start)} al ${nice(v.end)}.`}));
+  S.oncall.filter(o=>o.id!==g.id && o.type===g.type && (o.team||'')===(g.team||'') && overlaps(o.start,o.end,g.start,g.end))
+    .forEach(o=>out.push({lvl:'warn', msg:`Ya existe guardia ${g.type.toLowerCase()} (${mName(o.memberId)}) del ${nice(o.start)} al ${nice(o.end)}.`}));
+  return out;
+}
+
+/* ================== UI helpers ================== */
+function toast(t){ const el = document.getElementById('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2600); }
+function openModal(html){ document.getElementById('modal').innerHTML = html; document.getElementById('modalBg').classList.add('show'); }
+function closeModal(){ document.getElementById('modalBg').classList.remove('show'); }
+document.getElementById('modalBg').addEventListener('click', e=>{ if(e.target.id==='modalBg') closeModal(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+const memberOptions = (sel, withAll) => (withAll?`<option value="">Todo el equipo</option>`:'') + S.members.map(m=>`<option value="${m.id}" ${m.id===sel?'selected':''}>${esc(m.name)}</option>`).join('');
+const alertsHTML = list => list.map(c=>`<div class="alert ${c.lvl}">${c.lvl==='bad'?'⛔':'⚠️'} ${esc(c.msg)}</div>`).join('');
+function needTeam(){ return S.members.length ? '' : `<div class="panel empty">Primero agrega a los integrantes en <b>Equipo</b>. <br><br><button class="btn" onclick="go('team')">Ir a Equipo</button></div>`; }
+
+document.querySelectorAll('.nav').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)));
+function go(v){ ui.view=v; document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active', b.dataset.view===v)); render(); }
+function renderBadge(){ const n = S.vacations.filter(v=>v.status==='Pendiente').length; const b=document.getElementById('pendBadge'); b.textContent=n; b.classList.toggle('hidden', !n); }
+function render(){ const f = {dashboard,calendar,vacations,oncall,schedules,team,settings}[ui.view]; document.getElementById('main').innerHTML = f(); renderBadge();
+  if(dbRef && !isEditor) document.querySelectorAll('#main [onchange*="S."],#main [oninput*="S."]').forEach(el=>{ el.disabled=true; el.removeAttribute('onchange'); el.removeAttribute('oninput'); });
+}
+
+/* ================== Vista: Resumen ================== */
+function dashboard(){
+  const t = todayS(), yr = new Date().getFullYear();
+  const pend = S.vacations.filter(v=>v.status==='Pendiente').sort((a,b)=>a.start.localeCompare(b.start));
+  const offToday = offOn(t);
+  const gdToday = guardOn(t);
+  const in30 = fd(new Date(Date.now()+30*864e5));
+  const upcoming = S.vacations.filter(v=>v.status==='Aprobada' && v.end>=t && v.start<=in30).sort((a,b)=>a.start.localeCompare(b.start));
+  const nextGd = S.oncall.filter(g=>g.end>=t).sort((a,b)=>a.start.localeCompare(b.start)).slice(0,8);
+  const conflicts = [];
+  S.vacations.filter(v=>['Aprobada','Pendiente'].includes(v.status) && v.end>=t).forEach(v=>vacConflicts(v).forEach(c=>conflicts.push({...c, who:mName(v.memberId), what:`${v.type} ${nice(v.start)}–${nice(v.end)} (${v.status})`})));
+  return `
+  <div class="head"><h2>Resumen</h2><div class="toolbar">
+    <button class="btn" onclick="vacForm()">+ Solicitud de vacaciones</button>
+    <button class="btn sec" onclick="gdForm()">+ Guardia</button></div></div>
+  ${needTeam()}
+  <div class="grid4">
+    <div class="kpi"><div class="n">${S.members.length}</div><div class="l">Integrantes</div></div>
+    <div class="kpi"><div class="n" style="color:var(--warn)">${pend.length}</div><div class="l">Solicitudes pendientes</div></div>
+    <div class="kpi"><div class="n">${offToday.length}</div><div class="l">Ausentes hoy</div></div>
+    <div class="kpi"><div class="n" style="font-size:16px;padding-top:6px">${gdToday.length?gdToday.map(g=>`<span class="dot" style="background:${mColor(g.memberId)}"></span>${esc(mName(g.memberId))} <span class="muted" style="font-size:12px">(${esc(g.team||g.type)})</span>`).join('<br>'):'<span class="muted">Sin asignar</span>'}</div><div class="l">De guardia hoy</div></div>
+  </div>
+  ${conflicts.length?`<div class="panel"><h3>⚠️ Conflictos detectados (${conflicts.length})</h3>${conflicts.map(c=>`<div class="alert ${c.lvl}"><b>${esc(c.who)}</b> · ${esc(c.what)}<br>${esc(c.msg)}</div>`).join('')}</div>`:''}
+  <div class="panel"><h3>Turnos de hoy</h3><div class="toolbar">${COVER.map(r=>{ const who=S.members.filter(m=>shiftOf(m.id,t)===r && !offOn(t).some(v=>v.memberId===m.id)); return `<span class="shift" style="background:${SHIFT_COLORS[r]};color:var(--ink);padding:6px 10px"><b>${r}:</b> ${who.length?who.map(m=>esc(m.name)).join(', '):'<span style="color:var(--bad)">sin cubrir / no aplica</span>'}</span>`; }).join('')}</div></div>
+  <div class="grid2">
+    <div class="panel"><h3>Pendientes de aprobar</h3>
+      ${pend.length? `<table>${pend.map(v=>`<tr><td><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))}<br><span class="muted">${esc(v.type)} · ${vacWhen(v)} · ${vacDur(v)}</span></td>
+        <td style="text-align:right;white-space:nowrap"><button class="btn ok sm" onclick="setStatus('${v.id}','Aprobada')">Aprobar</button> <button class="btn bad sm" onclick="setStatus('${v.id}','Rechazada')">Rechazar</button></td></tr>`).join('')}</table>` : '<div class="empty">No hay solicitudes pendientes 🎉</div>'}
+    </div>
+    <div class="panel"><h3>Próximas guardias</h3>
+      ${nextGd.length? `<table>${nextGd.map(g=>`<tr><td><span class="dot" style="background:${mColor(g.memberId)}"></span>${esc(mName(g.memberId))}</td><td>${esc(g.team||g.type)}</td><td class="muted">${nice(g.start)} – ${nice(g.end)}</td></tr>`).join('')}</table>` : '<div class="empty">Sin guardias programadas</div>'}
+    </div>
+    <div class="panel"><h3>Ausencias próximas (30 días)</h3>
+      ${upcoming.length? `<table>${upcoming.map(v=>`<tr><td><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))}</td><td>${esc(v.type)}</td><td class="muted">${nice(v.start)} – ${nice(v.end)}</td></tr>`).join('')}</table>` : '<div class="empty">Nadie ausente en los próximos 30 días</div>'}
+    </div>
+    <div class="panel"><h3>Saldo de vacaciones ${yr}</h3>
+      ${S.members.length? `<table><tr><th>Integrante</th><th>Usados</th><th>Pend.</th><th>Disp.</th><th></th></tr>${S.members.map(m=>{ const tot=m.vacDays??S.settings.defaultDays, u=usedDays(m.id,yr), p=pendingDays(m.id,yr); return `<tr><td><span class="dot" style="background:${m.color}"></span>${esc(m.name)}</td><td>${u}</td><td>${p}</td><td><b style="color:${tot-u<0?'var(--bad)':'inherit'}">${tot-u}</b> / ${tot}</td><td><div class="bar"><i style="width:${Math.min(100,u/Math.max(tot,1)*100)}%;background:${m.color}"></i></div></td></tr>`;}).join('')}</table>` : '<div class="empty">—</div>'}
+    </div>
+  </div>`;
+}
+
+/* ================== Vista: Calendario ================== */
+function calendar(){
+  const y=ui.calY, m=ui.calM, first=new Date(y,m,1), start=new Date(first); start.setDate(1-dow(first));
+  const t=todayS(); let cells='';
+  const totalCells = Math.ceil((dow(first)+new Date(y,m+1,0).getDate())/7)*7;
+  for(let i=0;i<totalCells;i++){
+    const d=new Date(start); d.setDate(start.getDate()+i); const s=fd(d);
+    const flt = x => groupFilter(ui.calMember, x.memberId);
+    const gds = ui.calGuards ? guardOn(s).filter(flt) : [];
+    const vacs = offOn(s,true).filter(flt);
+    const hxs = S.vacations.filter(v=>isHX(v) && v.start===s && ['Aprobada','Pendiente'].includes(v.status)).filter(flt);
+    const offCount = offOn(s).length;
+    cells += `<div class="d ${d.getMonth()!==m?'out':''} ${s===t?'today':''} ${dow(d)>4?'we':''}">
+      <div class="num"><span>${d.getDate()}</span>${offCount>S.settings.maxOff?`<span class="off" title="Ausencias por encima del máximo">${offCount} aus.</span>`:''}</div>
+      ${gds.map(g=>`<span class="chip gd" style="border-color:${mColor(g.memberId)}" title="Guardia ${esc(g.team||'')} ${esc(g.type)}">🚨 ${esc(mName(g.memberId))}</span>`).join('')}
+      ${vacs.map(v=>`<span class="chip ${v.status==='Pendiente'?'pend':''}" style="background:${mColor(v.memberId)};border-color:${mColor(v.memberId)}" title="${esc(v.type)} (${v.status})" onclick="vacForm('${v.id}')">${v.status==='Pendiente'?'⏳ ':'🌴 '}${esc(mName(v.memberId))}</span>`).join('')}
+      ${hxs.map(v=>`<span class="chip hx ${v.status==='Pendiente'?'pend':''}" style="border-color:${mColor(v.memberId)}" title="${HX} (${v.status})" onclick="vacForm('${v.id}')">⏱ ${esc(mName(v.memberId))} ${v.tStart||''}–${v.tEnd||''}</span>`).join('')}
+    </div>`;
+  }
+  return `
+  <div class="head"><h2>Calendario</h2>
+    <div class="toolbar">
+      <button class="btn sec" onclick="calNav(-1)">◀</button>
+      <b style="min-width:150px;text-align:center">${MONTHS[m]} ${y}</b>
+      <button class="btn sec" onclick="calNav(1)">▶</button>
+      <button class="btn sec" onclick="calNav(0)">Hoy</button>
+      <select onchange="ui.calMember=this.value;render()">${groupMemberOptions(ui.calMember)}</select>
+      <label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" ${ui.calGuards?'checked':''} onchange="ui.calGuards=this.checked;render()"> Mostrar guardias</label>
+      <button class="btn sec" onclick="window.print()">🖨 Imprimir</button>
+    </div></div>
+  <div class="cal">${DAYS.map(d=>`<div class="dh">${d}</div>`).join('')}${cells}</div>
+  <div class="legend">
+    <span><i class="sw" style="background:#fff;border-left:4px solid var(--accent);border:1px solid #ccc;border-left-width:4px"></i>🚨 Guardia</span>
+    <span><i class="sw" style="background:var(--accent)"></i>🌴 Ausencia aprobada</span>
+    <span><i class="sw" style="border:1.5px dashed var(--accent)"></i>⏳ Solicitud pendiente</span>
+    <span>⏱ Horas extras a cambiar</span>
+    <span style="color:var(--bad)">“N aus.” = más ausentes que el máximo permitido (${S.settings.maxOff})</span>
+  </div>`;
+}
+function calNav(n){ if(n===0){ const d=new Date(); ui.calY=d.getFullYear(); ui.calM=d.getMonth(); } else { ui.calM+=n; if(ui.calM<0){ui.calM=11;ui.calY--;} if(ui.calM>11){ui.calM=0;ui.calY++;} } render(); }
+
+/* ================== Vista: Vacaciones ================== */
+function vacations(){
+  const list = S.vacations.filter(v=>(ui.vacFilter==='Todas'||v.status===ui.vacFilter) && groupFilter(ui.vacMember, v.memberId))
+    .sort((a,b)=>b.start.localeCompare(a.start));
+  return `
+  <div class="head"><h2>Solicitudes de vacaciones y ausencias</h2>
+    <div class="toolbar">
+      <select onchange="ui.vacFilter=this.value;render()">${['Todas','Pendiente','Aprobada','Rechazada','Cancelada'].map(s=>`<option ${s===ui.vacFilter?'selected':''}>${s}</option>`).join('')}</select>
+      <select onchange="ui.vacMember=this.value;render()">${groupMemberOptions(ui.vacMember)}</select>
+      <button class="btn sec" onclick="exportCSV('vacations')">⬇ CSV</button>
+      <button class="btn" onclick="vacForm()">+ Nueva solicitud</button>
+    </div></div>
+  ${needTeam()}
+  <div class="panel">${list.length?`<table>
+    <tr><th>Integrante</th><th>Tipo</th><th>Fechas</th><th>Duración</th><th>Estado</th><th>Solicitada</th><th>Alertas</th><th></th></tr>
+    ${list.map(v=>{ const c=['Aprobada','Pendiente'].includes(v.status)?vacConflicts(v):[]; return `<tr>
+      <td><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))}</td>
+      <td>${esc(v.type)}${v.notes?`<br><span class="muted" style="font-size:12px">${esc(v.notes)}</span>`:''}</td>
+      <td>${vacWhen(v)}</td>
+      <td>${vacDur(v)}</td>
+      <td><span class="pill ${v.status}">${v.status}</span></td>
+      <td class="muted">${nice(v.requestedAt)}</td>
+      <td>${c.length?`<span title="${esc(c.map(x=>x.msg).join('\n'))}" style="cursor:help">${c.some(x=>x.lvl==='bad')?'⛔':'⚠️'} ${c.length}</span>`:'<span class="muted">—</span>'}</td>
+      <td style="white-space:nowrap;text-align:right">
+        ${v.status==='Pendiente'?`<button class="btn ok sm" onclick="setStatus('${v.id}','Aprobada')">✓</button> <button class="btn bad sm" onclick="setStatus('${v.id}','Rechazada')">✕</button>`:''}
+        <button class="btn sec sm" onclick="vacForm('${v.id}')">Editar</button></td></tr>`;}).join('')}
+  </table>`:'<div class="empty">No hay solicitudes con este filtro.</div>'}</div>`;
+}
+function vacForm(id){
+  if(!S.members.length){ go('team'); return toast('Agrega primero a tu equipo'); }
+  const v = id ? S.vacations.find(x=>x.id===id) : { memberId:S.members[0].id, type:'Vacaciones', start:todayS(), end:todayS(), status:'Pendiente', requestedAt:todayS(), notes:'' };
+  openModal(`<h3>${id?'Editar':'Nueva'} solicitud</h3>
+    <div class="form">
+      <label class="f">Integrante<select id="vMember" onchange="vacPreview('${id||''}')">${memberOptions(v.memberId)}</select></label>
+      <label class="f">Tipo<select id="vType" onchange="vacPreview('${id||''}')">${VAC_TYPES.map(t=>`<option ${t===v.type?'selected':''}>${t}</option>`).join('')}</select></label>
+      <label class="f"><span id="lStart">Desde</span><input type="date" id="vStart" value="${v.start}" onchange="vacPreview('${id||''}')"></label>
+      <label class="f nohx">Hasta<input type="date" id="vEnd" value="${v.end}" onchange="vacPreview('${id||''}')"></label>
+      <label class="f onlyhx">Hora inicio<input type="time" id="vTS" value="${v.tStart||'18:00'}" onchange="vacPreview('${id||''}')"></label>
+      <label class="f onlyhx">Hora fin<input type="time" id="vTE" value="${v.tEnd||'20:00'}" onchange="vacPreview('${id||''}')"></label>
+      <label class="f">Estado<select id="vStatus">${['Pendiente','Aprobada','Rechazada','Cancelada'].map(s=>`<option ${s===v.status?'selected':''}>${s}</option>`).join('')}</select></label>
+      <label class="f">Fecha de solicitud<input type="date" id="vReq" value="${v.requestedAt}"></label>
+      <label class="f full">Notas / comentarios<textarea id="vNotes" placeholder="Ej. quién cubre, motivo, folio…">${esc(v.notes)}</textarea></label>
+    </div>
+    <div id="vPrev"></div>
+    <div class="actions">${id?`<button class="btn bad" style="margin-right:auto" onclick="delVac('${id}')">Eliminar</button>`:''}
+      <button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="saveVac('${id||''}')">Guardar</button></div>`);
+  vacPreview(id||'');
+}
+function readVac(id){ const t=val('vType'), hx=t===HX; return { id:id||'_new', memberId:val('vMember'), type:t, start:val('vStart'), end:hx?val('vStart'):val('vEnd'), tStart:hx?val('vTS'):undefined, tEnd:hx?val('vTE'):undefined, status:val('vStatus'), requestedAt:val('vReq'), notes:val('vNotes').trim() }; }
+const val = id => document.getElementById(id).value;
+function vacPreview(id){
+  const v = readVac(id); const el = document.getElementById('vPrev'); if(!el) return;
+  document.querySelectorAll('#modal .onlyhx').forEach(x=>x.style.display=isHX(v)?'':'none');
+  document.querySelectorAll('#modal .nohx').forEach(x=>x.style.display=isHX(v)?'none':'');
+  document.getElementById('lStart').textContent = isHX(v) ? 'Día' : 'Desde';
+  if(isHX(v)) return el.innerHTML = v.tStart&&v.tEnd ? `<div class="alert ok">⏱ ${fmtH(hxHours(v))} de horas extras el ${nice(v.start)} (${v.tStart}–${v.tEnd}).</div>` : '';
+  if(!v.start||!v.end) return el.innerHTML='';
+  if(v.end<v.start) return el.innerHTML='<div class="alert bad">La fecha final es anterior a la inicial.</div>';
+  const c = vacConflicts(v);
+  el.innerHTML = `<div class="alert ok">📆 ${businessDays(v.start,v.end)} día(s) hábil(es) (lun–vie).</div>` + alertsHTML(c);
+}
+function saveVac(id){
+  const v = readVac(id);
+  if(!v.start||!v.end) return toast('Indica las fechas');
+  if(v.end<v.start) return toast('Revisa el rango de fechas');
+  if(isHX(v) && (!v.tStart||!v.tEnd)) return toast('Indica la hora de inicio y fin');
+  if(id){ Object.assign(S.vacations.find(x=>x.id===id), v, {id}); }
+  else { v.id=uid(); S.vacations.push(v); }
+  save(); closeModal(); render(); toast('Solicitud guardada');
+}
+function setStatus(id, st){
+  const v = S.vacations.find(x=>x.id===id);
+  if(st==='Aprobada'){ const c=vacConflicts(v); if(c.length && !confirm('Esta solicitud tiene alertas:\n\n• '+c.map(x=>x.msg).join('\n• ')+'\n\n¿Aprobar de todos modos?')) return; }
+  v.status=st; v.decidedAt=todayS(); save(); render(); toast(`Solicitud ${st.toLowerCase()}`);
+}
+function delVac(id){ if(!confirm('¿Eliminar esta solicitud?')) return; S.vacations=S.vacations.filter(v=>v.id!==id); save(); closeModal(); render(); }
+
+/* ================== Vista: Guardias ================== */
+function oncall(){
+  const t=todayS();
+  const list = S.oncall.filter(g=>(!ui.gdMember||g.memberId===ui.gdMember) && (!ui.gdTeam||g.team===ui.gdTeam)).sort((a,b)=>a.start.localeCompare(b.start));
+  const counts = S.members.map(m=>({m, n:S.oncall.filter(g=>g.memberId===m.id && g.start.slice(0,4)==String(new Date().getFullYear())).length})).sort((a,b)=>a.n-b.n);
+  return `
+  <div class="head"><h2>Roles de guardia</h2>
+    <div class="toolbar">
+      <select onchange="ui.gdTeam=this.value;render()"><option value="">Todos los equipos</option>${['Colaboración','MM'].map(t=>`<option ${t===ui.gdTeam?'selected':''}>${t}</option>`).join('')}</select>
+      <select onchange="ui.gdMember=this.value;render()">${memberOptions(ui.gdMember,true)}</select>
+      <button class="btn sec" onclick="exportCSV('oncall')">⬇ CSV</button>
+      <button class="btn sec" onclick="rotationForm()">🔄 Generar rotación</button>
+      <button class="btn" onclick="gdForm()">+ Guardia</button>
+    </div></div>
+  ${needTeam()}
+  <div class="grid2" style="grid-template-columns:2fr 1fr">
+  <div class="panel">${list.length?`<table>
+    <tr><th>Integrante</th><th>Equipo</th><th>Tipo</th><th>Periodo</th><th>Estado</th><th>Alertas</th><th></th></tr>
+    ${list.map(g=>{ const c=gdConflicts(g); const st = g.end<t?'Concluida':(g.start<=t?'En curso':'Programada'); return `<tr>
+      <td><span class="dot" style="background:${mColor(g.memberId)}"></span>${esc(mName(g.memberId))}${g.notes?`<br><span class="muted" style="font-size:12px">${esc(g.notes)}</span>`:''}</td>
+      <td>${esc(g.team||'')}</td><td>${esc(g.type)}</td><td>${nice(g.start)} – ${nice(g.end)}</td>
+      <td>${st==='En curso'?'<b style="color:var(--ok)">● En curso</b>':`<span class="muted">${st}</span>`}</td>
+      <td>${c.length?`<span title="${esc(c.map(x=>x.msg).join('\n'))}" style="cursor:help">${c.some(x=>x.lvl==='bad')?'⛔':'⚠️'} ${c.length}</span>`:'<span class="muted">—</span>'}</td>
+      <td style="text-align:right"><button class="btn sec sm" onclick="gdForm('${g.id}')">Editar</button></td></tr>`;}).join('')}
+  </table>`:'<div class="empty">Aún no hay guardias registradas.</div>'}</div>
+  <div class="panel"><h3>Guardias por persona (${new Date().getFullYear()})</h3>
+    ${counts.length?`<table>${counts.map(x=>`<tr><td><span class="dot" style="background:${x.m.color}"></span>${esc(x.m.name)}</td><td style="text-align:right"><b>${x.n}</b></td></tr>`).join('')}</table><p class="muted" style="font-size:12px">Ordenado de menos a más, útil para repartir de forma equitativa.</p>`:'<div class="empty">—</div>'}
+  </div></div>`;
+}
+function gdForm(id){
+  if(!S.members.length){ go('team'); return toast('Agrega primero a tu equipo'); }
+  const g = id ? S.oncall.find(x=>x.id===id) : { memberId:S.members[0].id, team:'Colaboración', type:'Primaria', start:todayS(), end:fd(new Date(Date.now()+6*864e5)), notes:'' };
+  openModal(`<h3>${id?'Editar':'Nueva'} guardia</h3>
+    <div class="form">
+      <label class="f">Integrante<select id="gMember" onchange="gdPreview('${id||''}')">${memberOptions(g.memberId)}</select></label>
+      <label class="f">Equipo de guardia<select id="gTeam" onchange="gdPreview('${id||''}')">${['Colaboración','MM'].map(t=>`<option ${t===g.team?'selected':''}>${t}</option>`).join('')}</select></label>
+      <label class="f">Tipo<select id="gType" onchange="gdPreview('${id||''}')">${GD_TYPES.map(t=>`<option ${t===g.type?'selected':''}>${t}</option>`).join('')}</select></label>
+      <label class="f">Desde<input type="date" id="gStart" value="${g.start}" onchange="gdPreview('${id||''}')"></label>
+      <label class="f">Hasta<input type="date" id="gEnd" value="${g.end}" onchange="gdPreview('${id||''}')"></label>
+      <label class="f full">Notas<textarea id="gNotes" placeholder="Ej. teléfono de guardia, escalamiento, cobertura…">${esc(g.notes)}</textarea></label>
+    </div><div id="gPrev"></div>
+    <div class="actions">${id?`<button class="btn bad" style="margin-right:auto" onclick="delGd('${id}')">Eliminar</button>`:''}
+      <button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="saveGd('${id||''}')">Guardar</button></div>`);
+  gdPreview(id||'');
+}
+function readGd(id){ return { id:id||'_new', memberId:val('gMember'), team:val('gTeam'), type:val('gType'), start:val('gStart'), end:val('gEnd'), notes:val('gNotes').trim() }; }
+function gdPreview(id){ const g=readGd(id), el=document.getElementById('gPrev'); if(!el) return; if(g.end<g.start) return el.innerHTML='<div class="alert bad">La fecha final es anterior a la inicial.</div>'; el.innerHTML=alertsHTML(gdConflicts(g)); }
+function saveGd(id){
+  const g = readGd(id); if(!g.start||!g.end||g.end<g.start) return toast('Revisa las fechas');
+  if(id) Object.assign(S.oncall.find(x=>x.id===id), g, {id}); else { g.id=uid(); S.oncall.push(g); }
+  save(); closeModal(); render(); toast('Guardia guardada');
+}
+function delGd(id){ if(!confirm('¿Eliminar esta guardia?')) return; S.oncall=S.oncall.filter(g=>g.id!==id); save(); closeModal(); render(); }
+function rotationForm(){
+  if(!S.members.length){ go('team'); return toast('Agrega primero a tu equipo'); }
+  const mon = new Date(); mon.setDate(mon.getDate()-dow(mon)+7);
+  openModal(`<h3>Generar rotación de guardias</h3>
+    <p class="muted" style="margin-top:0">Crea guardias consecutivas rotando entre las personas seleccionadas, en el orden mostrado.</p>
+    <div class="form">
+      <label class="f">Fecha de inicio<input type="date" id="rStart" value="${fd(mon)}"></label>
+      <label class="f">Duración de cada guardia (días)<input type="number" id="rLen" value="7" min="1"></label>
+      <label class="f">Número de periodos<input type="number" id="rCount" value="${S.members.length*2}" min="1"></label>
+      <label class="f">Tipo<select id="rType">${GD_TYPES.map(t=>`<option>${t}</option>`).join('')}</select></label>
+      <label class="f">Equipo de guardia<select id="rTeam" onchange="document.querySelectorAll('.rM').forEach(c=>c.checked=c.dataset.g===this.value&&c.dataset.o==='1')">${['Colaboración','MM'].map(t=>`<option>${t}</option>`).join('')}</select></label>
+      <div class="full"><label class="f">Participantes (en este orden)</label>
+        ${S.members.map(m=>`<label style="display:inline-flex;gap:6px;margin:6px 14px 0 0;align-items:center"><input type="checkbox" class="rM" value="${m.id}" data-g="${esc(m.group||'')}" data-o="${m.oncall!==false?1:0}" ${m.oncall!==false&&m.group==='Colaboración'?'checked':''}><span class="dot" style="background:${m.color}"></span>${esc(m.name)}</label>`).join('')}</div>
+      <label class="full" style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="rSkip" checked> Saltar a quien tenga vacaciones aprobadas en ese periodo</label>
+    </div>
+    <div class="actions"><button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="genRotation()">Generar</button></div>`);
+}
+function genRotation(){
+  const ids=[...document.querySelectorAll('.rM:checked')].map(x=>x.value);
+  if(!ids.length) return toast('Selecciona al menos una persona');
+  const len=Math.max(1,+val('rLen')), count=Math.max(1,+val('rCount')), type=val('rType'), team=val('rTeam'), skip=document.getElementById('rSkip').checked;
+  let d=pd(val('rStart')), idx=0, made=0, warn=0;
+  for(let i=0;i<count;i++){
+    const s=fd(d), e=new Date(d); e.setDate(e.getDate()+len-1); const es=fd(e);
+    let pick=null;
+    for(let k=0;k<ids.length;k++){
+      const cand=ids[(idx+k)%ids.length];
+      const busy=S.vacations.some(v=>v.memberId===cand && v.status==='Aprobada' && overlaps(v.start,v.end,s,es));
+      if(!skip || !busy){ pick=cand; idx=(idx+k+1)%ids.length; break; }
+    }
+    if(!pick){ pick=ids[idx%ids.length]; idx++; warn++; }
+    S.oncall.push({id:uid(), memberId:pick, team, type, start:s, end:es, notes:'Generada por rotación'}); made++;
+    d.setDate(d.getDate()+len);
+  }
+  save(); closeModal(); render(); toast(`${made} guardias creadas${warn?` · ${warn} con conflicto`:''}`);
+}
+
+/* ================== Vista: Horarios (rotación semanal) ================== */
+const SHIFTS = ['Mañana','Mutante','Tarde','Oficina','Home office','Descanso'];
+const SHIFT_COLORS = { 'Mañana':'#f8cbad', 'Mutante':'#c6efce', 'Tarde':'#ffc000', 'Oficina':'#ffffff', 'Home office':'#e58ee0', 'Descanso':'#eceef2' };
+const ROLE_COLORS = { 'Mañana':'#f8cbad', 'Mutante':'#ffc000', 'Tarde':'#9dc3e6' };
+const COVER = ['Mañana','Mutante','Tarde'];
+function defaultPositions(n){
+  const O='Oficina', D='Descanso';
+  const base = [
+    {name:'Mañana',  days:['Mañana','Mañana','Mañana','Mañana','Mañana',D,D]},
+    {name:'Mutante', days:[D,'Mutante','Mutante','Mutante','Mutante',O,D]},
+    {name:'Tarde',   days:[O,D,'Tarde','Tarde','Tarde',D,D]},
+    {name:'Oficina 1', days:['Tarde','Tarde',O,O,O,D,D]},
+  ];
+  for(let i=2; base.length<n; i++) base.push({name:'Oficina '+i, days:[O,O,O,O,O,D,D]});
+  return base.slice(0,n);
+}
+function syncRotation(){
+  const R = S.rotation;
+  S.members.forEach(m=>{ if(m.shifts!==false && !R.order.includes(m.id)) R.order.push(m.id); });
+  R.order = R.order.filter(id=>member(id) && member(id).shifts!==false);
+  while(R.positions.length < R.order.length){ const k=R.positions.filter(p=>/^Oficina/.test(p.name)).length+1; R.positions.push({name:'Oficina '+k, days:['Oficina','Oficina','Oficina','Oficina','Oficina','Descanso','Descanso']}); }
+  if(R.positions.length > R.order.length) R.positions.length = R.order.length;
+}
+function mondayOf(s){ const d=pd(s); d.setDate(d.getDate()-dow(d)); return fd(d); }
+function weekIdx(s){ return Math.round((pd(mondayOf(s)) - pd(mondayOf(S.rotation.anchor)))/(7*864e5)); }
+const mod = (a,n) => ((a%n)+n)%n;
+let rotCache = new Map();
+function onBreak(mid, w){ return S.rotation.breaks.some(b=>b.memberId===mid && w>=weekIdx(b.start) && w<=weekIdx(b.end)); }
+function lineup(w){
+  if(rotCache.has(w)) return rotCache.get(w);
+  const R=S.rotation; let L;
+  if(w<=0){ const n=R.order.length; L=new Array(n); R.order.forEach((id,i)=>L[mod(i+w,n)]=id); L=L.filter(id=>!onBreak(id,w)); }
+  else {
+    L = lineup(w-1).slice();
+    if(L.length) L.unshift(L.pop());
+    L = L.filter(id=>R.order.includes(id) && !onBreak(id,w));
+    const back = R.order.filter(id=>!L.includes(id) && !onBreak(id,w))
+      .map(id=>({id, pos:(R.breaks.filter(b=>b.memberId===id && weekIdx(b.end)===w-1).map(b=>b.returnPos)[0] ?? 99)})).sort((a,b)=>a.pos-b.pos);
+    back.forEach(x=>L.splice(Math.min(x.pos,L.length),0,x.id));
+  }
+  rotCache.set(w,L); return L;
+}
+function positionOf(mid, s){ return lineup(weekIdx(s)).indexOf(mid); }
+function memberAtPos(p, s){ return lineup(weekIdx(s))[p]; }
+function roleShift(mid, s){ const p=positionOf(mid,s); if(p<0) return 'Descanso'; return S.rotation.positions[p].days[dow(pd(s))] || 'Descanso'; }
+function shiftOf(mid, s){ const o=S.rotation.overrides[mid+'|'+s]; return o ? o.shift : roleShift(mid,s); }
+function shiftHours(sh){ const h=S.rotation.hours[sh]; return h ? hoursBetween(h.start,h.end) : 0; }
+
+function schedules(){
+  syncRotation();
+  const base = new Date(); base.setDate(base.getDate()-dow(base)+(ui.weekOff||0)*7);
+  const week = [...Array(7)].map((_,i)=>{ const d=new Date(base); d.setDate(base.getDate()+i); return fd(d); });
+  const R = S.rotation, t = todayS();
+  const rows = R.positions.map((pos,p)=>{
+    const mid = memberAtPos(p, week[0]); const m = member(mid); if(!m) return '';
+    let hrs = 0;
+    const cells = week.map(s=>{
+      const vac = S.vacations.find(v=>v.memberId===mid && v.status==='Aprobada' && inRange(s,v.start,v.end));
+      const gd = S.oncall.find(g=>g.memberId===mid && inRange(s,g.start,g.end));
+      const ov = R.overrides[mid+'|'+s];
+      const sh = shiftOf(mid,s);
+      let txt, bg;
+      if(vac){ txt='🌴 '+vac.type; bg='#d9ead3'; }
+      else { txt = sh==='Descanso' ? '' : sh; bg = SHIFT_COLORS[sh]||'#fff'; hrs += shiftHours(sh); }
+      const warn = vac && COVER.includes(roleShift(mid,s)) ? `<div style="font-size:10px;color:var(--bad)">⚠ ${roleShift(mid,s)} sin cubrir</div>` : '';
+      return `<td class="sc ${s===t?'tday':''}" style="background:${bg}" onclick="cellEdit('${mid}','${s}')" title="${ov?'Cambio manual'+(ov.note?': '+esc(ov.note):''):'Según rol '+esc(pos.name)}">
+        ${esc(txt)}${ov?'<sup style="color:var(--accent)">✎</sup>':''}${gd?`<div style="font-size:10px">🚨 Guardia</div>`:''}${warn}</td>`;
+    }).join('');
+    return `<tr><td class="role" style="background:${ROLE_COLORS[pos.name]||'#fff'}">${esc(pos.name)}</td><td class="eng"><span class="dot" style="background:${m.color}"></span>${esc(m.name)}</td>${cells}<td><b>${hrs.toFixed(1).replace('.0','')}</b></td></tr>`;
+  }).join('');
+  return `
+  <div class="head"><h2>Horarios del equipo</h2>
+    <div class="toolbar">
+      <button class="btn sec" onclick="ui.weekOff=(ui.weekOff||0)-1;render()">◀</button>
+      <b>Semana del ${nice(week[0])}</b>
+      <button class="btn sec" onclick="ui.weekOff=(ui.weekOff||0)+1;render()">▶</button>
+      <button class="btn sec" onclick="ui.weekOff=0;render()">Actual</button>
+      <button class="btn sec" onclick="exportWeekCSV()">⬇ Semana CSV</button>
+      <button class="btn" onclick="rotForm()">⚙️ Configurar rotación</button>
+    </div></div>
+  ${needTeam()}
+  ${S.members.length?`<div class="panel" style="overflow:auto"><table class="xl">
+    <tr><th>Rol</th><th>Ingeniero</th>${week.map((s,i)=>`<th>${DAYS[i]}<br>${pd(s).getDate()}-${MONTHS[pd(s).getMonth()].slice(0,3)}</th>`).join('')}<th>Hrs</th></tr>
+    ${rows}</table>
+    ${(()=>{ const out=R.order.filter(id=>onBreak(id,weekIdx(week[0]))); return out.length?`<p class="muted" style="margin:10px 0 0">Fuera de la rotación esta semana: ${out.map(id=>{ const b=R.breaks.find(b=>b.memberId===id&&inRange(week[0],mondayOf(b.start),b.end)); return `<b>${esc(mName(id))}</b>${b?` (${esc(b.reason||'pausa')} hasta ${nice(b.end)}, regresa como ${esc(R.positions[b.returnPos]?.name||'último rol')})`:''}`; }).join(', ')}</p>`:''; })()}
+  </div>
+  ${fixedTable(week)}
+  <div class="legend">${SHIFTS.map(s=>`<span><i class="sw" style="background:${SHIFT_COLORS[s]};border:1px solid #ccc"></i>${s}${R.hours[s]?` <span class="muted">(${R.hours[s].start}–${R.hours[s].end})</span>`:''}</span>`).join('')}<span>✎ = cambio manual</span></div>
+  <p class="muted" style="font-size:12px">Cada semana todos bajan una posición (el último pasa a Mañana). Haz clic en una celda para cambiar ese día (intercambio, home office, descanso…). Las vacaciones aprobadas y guardias se muestran encima.</p>`:''}`;
+}
+function fixedTable(week){
+  const fx = S.members.filter(m=>m.shifts===false && m.fixed);
+  if(!fx.length) return '';
+  const groups=[...new Set(fx.map(m=>m.group||'Otros'))];
+  return groups.map(g=>`<div class="panel" style="overflow:auto"><h3>${esc(g)} · horario fijo</h3><table class="xl">
+    <tr><th>Grupo</th><th>Colaborador</th>${week.map((s,i)=>`<th>${DAYS[i]}<br>${pd(s).getDate()}-${MONTHS[pd(s).getMonth()].slice(0,3)}</th>`).join('')}<th>Hrs</th></tr>
+    ${fx.filter(m=>(m.group||'Otros')===g).map(m=>{ let hrs=0; return `<tr><td class="role">${esc(g)}</td><td class="eng"><span class="dot" style="background:${m.color}"></span>${esc(m.name)}</td>${week.map((s,i)=>{
+      const vac=S.vacations.find(v=>v.memberId===m.id&&v.status==='Aprobada'&&inRange(s,v.start,v.end));
+      const gd=S.oncall.find(x=>x.memberId===m.id&&inRange(s,x.start,x.end));
+      const ov=S.rotation.overrides[m.id+'|'+s];
+      let txt='',bg='#eceef2';
+      if(vac){ txt='🌴 '+vac.type; bg='#d9ead3'; }
+      else if(ov){ txt=ov.shift==='Descanso'?'':ov.shift; bg=SHIFT_COLORS[ov.shift]||'#fff'; hrs+=shiftHours(ov.shift); }
+      else if(m.fixed.days.includes(i)){ txt=`${m.fixed.start}–${m.fixed.end}`; bg='#fff'; hrs+=hoursBetween(m.fixed.start,m.fixed.end); }
+      return `<td class="sc" style="background:${bg}" onclick="cellEdit('${m.id}','${s}')">${esc(txt)}${ov?'<sup style="color:var(--accent)">✎</sup>':''}${gd?'<div style="font-size:10px">🚨 Guardia</div>':''}</td>`; }).join('')}<td><b>${hrs.toFixed(1).replace('.0','')}</b></td></tr>`; }).join('')}
+  </table></div>`).join('');
+}
+function cellEdit(mid, s){
+  const ov = S.rotation.overrides[mid+'|'+s];
+  const role = roleShift(mid,s);
+  openModal(`<h3>${esc(mName(mid))} · ${DAYS[dow(pd(s))]} ${nice(s)}</h3>
+    <p class="muted" style="margin-top:0">${positionOf(mid,s)>=0?`Según su rol esta semana (${esc(S.rotation.positions[positionOf(mid,s)].name)}): <b>${role}</b>`:'Horario fijo / fuera de rotación'}</p>
+    <div class="form">
+      <label class="f">Turno de este día<select id="cShift">${SHIFTS.map(x=>`<option ${x===(ov?ov.shift:role)?'selected':''}>${x}</option>`).join('')}</select></label>
+      <label class="f">Nota<input id="cNote" value="${esc(ov?.note||'')}" placeholder="Ej. intercambio con Edgar"></label>
+    </div>
+    <div class="actions">${ov?`<button class="btn sec" style="margin-right:auto" onclick="delete S.rotation.overrides['${mid}|${s}'];save();closeModal();render()">Volver al turno del rol</button>`:''}
+      <button class="btn sec" onclick="closeModal()">Cancelar</button>
+      <button class="btn" onclick="saveCell('${mid}','${s}')">Guardar</button></div>`);
+}
+function saveCell(mid, s){
+  const sh = val('cShift'), note = val('cNote').trim(), k = mid+'|'+s;
+  if(sh===roleShift(mid,s) && !note) delete S.rotation.overrides[k]; else S.rotation.overrides[k] = {shift:sh, note};
+  save(); closeModal(); render();
+}
+function rotForm(keep){
+  syncRotation();
+  if(!keep) ui.rot = JSON.parse(JSON.stringify({anchor:S.rotation.anchor, order:S.rotation.order, positions:S.rotation.positions, hours:S.rotation.hours, breaks:S.rotation.breaks}));
+  const D = ui.rot;
+  openModal(`<h3>Configurar rotación semanal</h3>
+    <div class="form" style="grid-template-columns:1fr 2fr">
+      <label class="f">Semana de referencia (lunes)<input type="date" id="rAnchor" value="${D.anchor}" onchange="ui.rot.anchor=this.value"></label>
+      <p class="muted" style="font-size:12px;margin:18px 0 0">En esa semana, cada ingeniero ocupa el rol de su misma fila. Las semanas siguientes rotan una posición hacia abajo.</p>
+    </div>
+    <div style="overflow:auto;margin-top:12px"><table class="xl">
+      <tr><th>Rol</th><th>Ingeniero (semana ref.)</th>${DAYS.map(d=>`<th>${d}</th>`).join('')}</tr>
+      ${D.positions.map((p,i)=>`<tr>
+        <td><input value="${esc(p.name)}" style="width:95px" onchange="ui.rot.positions[${i}].name=this.value"></td>
+        <td style="white-space:nowrap">${esc(mName(D.order[i]))}
+          <button class="btn sec sm" ${i===0?'disabled':''} onclick="rotMove(${i},-1)">↑</button><button class="btn sec sm" ${i===D.order.length-1?'disabled':''} onclick="rotMove(${i},1)">↓</button></td>
+        ${p.days.map((d,j)=>`<td><select style="padding:3px;font-size:12px" onchange="ui.rot.positions[${i}].days[${j}]=this.value">${SHIFTS.map(x=>`<option ${x===d?'selected':''}>${x}</option>`).join('')}</select></td>`).join('')}
+      </tr>`).join('')}
+    </table></div>
+    <h3 style="margin-top:16px">Pausas en la rotación (incapacidad, licencia…)</h3>
+    <p class="muted" style="font-size:12px;margin-top:0">Durante la pausa la persona sale del rol y los demás siguen rotando. La semana siguiente al fin de la pausa regresa en el rol indicado.</p>
+    <table class="xl"><tr><th>Persona</th><th>Desde</th><th>Hasta</th><th>Regresa como</th><th>Motivo</th><th></th></tr>
+      ${(D.breaks||[]).map((b,i)=>`<tr><td><select onchange="ui.rot.breaks[${i}].memberId=this.value">${D.order.map(id=>`<option value="${id}" ${id===b.memberId?'selected':''}>${esc(mName(id))}</option>`).join('')}</select></td>
+        <td><input type="date" value="${b.start}" onchange="ui.rot.breaks[${i}].start=this.value"></td>
+        <td><input type="date" value="${b.end}" onchange="ui.rot.breaks[${i}].end=this.value"></td>
+        <td><select onchange="ui.rot.breaks[${i}].returnPos=+this.value">${D.positions.map((p,j)=>`<option value="${j}" ${j===b.returnPos?'selected':''}>${esc(p.name)}</option>`).join('')}</select></td>
+        <td><input value="${esc(b.reason||'')}" style="width:110px" onchange="ui.rot.breaks[${i}].reason=this.value"></td>
+        <td><button class="btn bad sm" onclick="ui.rot.breaks.splice(${i},1);rotForm(true)">✕</button></td></tr>`).join('')}
+    </table>
+    <button class="btn sec sm" style="margin-top:8px" onclick="ui.rot.breaks.push({id:uid(),memberId:ui.rot.order[0],start:todayS(),end:todayS(),returnPos:ui.rot.positions.length-1,reason:''});rotForm(true)">+ Agregar pausa</button>
+    <h3 style="margin-top:16px">Horario de cada turno</h3>
+    <div style="display:flex;gap:14px;flex-wrap:wrap">${['Mañana','Mutante','Tarde','Oficina','Home office'].map(s=>`<label class="f">${s}<span><input type="time" value="${D.hours[s]?.start||'09:00'}" onchange="ui.rot.hours['${s}'].start=this.value"> – <input type="time" value="${D.hours[s]?.end||'18:00'}" onchange="ui.rot.hours['${s}'].end=this.value"></span></label>`).join('')}</div>
+    <div class="actions"><button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="saveRot()">Guardar</button></div>`);
+  document.getElementById('modal').style.width='min(1000px,96vw)';
+}
+function rotMove(i, d){ const o=ui.rot.order; [o[i],o[i+d]]=[o[i+d],o[i]]; rotForm(true); }
+function saveRot(){ Object.assign(S.rotation, ui.rot); S.rotation.anchor = mondayOf(S.rotation.anchor); document.getElementById('modal').style.width=''; save(); closeModal(); render(); toast('Rotación guardada'); }
+function exportWeekCSV(){
+  const base = new Date(); base.setDate(base.getDate()-dow(base)+(ui.weekOff||0)*7);
+  const week = [...Array(7)].map((_,i)=>{ const d=new Date(base); d.setDate(base.getDate()+i); return fd(d); });
+  const q = s => `"${String(s??'').replace(/"/g,'""')}"`;
+  const rows = [['Rol','Ingeniero',...week.map((s,i)=>`${DAYS[i]} ${s}`)], ...S.rotation.positions.map((p,i)=>{ const mid=memberAtPos(i,week[0]); return [p.name, mName(mid), ...week.map(s=>{ const v=S.vacations.find(v=>v.memberId===mid&&v.status==='Aprobada'&&inRange(s,v.start,v.end)); return v?v.type:shiftOf(mid,s).replace('Descanso',''); })]; })];
+  download(`horario-semana-${week[0]}.csv`, '﻿'+rows.map(r=>r.map(q).join(',')).join('\r\n'), 'text/csv;charset=utf-8');
+}
+function hoursBetween(a,b){ const [h1,m1]=a.split(':').map(Number),[h2,m2]=b.split(':').map(Number); let x=(h2*60+m2)-(h1*60+m1); if(x<0) x+=1440; return x/60; }
+
+/* ================== Vista: Equipo ================== */
+function team(){
+  const yr=new Date().getFullYear();
+  return `
+  <div class="head"><h2>Equipo</h2><button class="btn" onclick="memberForm()">+ Agregar integrante</button></div>
+  <div class="panel">${S.members.length?`<table>
+    <tr><th>Nombre</th><th>Grupo</th><th>Puesto / rol</th><th>Contacto</th><th>Rol esta semana</th><th>Días vac. ${yr}</th><th>Participa en guardias</th><th></th></tr>
+    ${[...S.members].sort((a,b)=>GROUPS.indexOf(a.group)-GROUPS.indexOf(b.group)).map(m=>`<tr><td><span class="dot" style="background:${m.color}"></span><b>${esc(m.name)}</b></td><td>${esc(m.group||'')}</td><td>${esc(m.role||'')}</td>
+      <td class="muted">${esc(m.email||'')}${m.phone?`<br>${esc(m.phone)}`:''}</td>
+      <td>${m.shifts!==false?(positionOf(m.id,todayS())>=0?esc(S.rotation.positions[positionOf(m.id,todayS())].name):'Fuera de rotación'):(m.fixed?`Fijo ${m.fixed.start}–${m.fixed.end}`:'—')}</td><td>${usedDays(m.id,yr)} / ${m.vacDays??S.settings.defaultDays}</td><td>${m.oncall===false?'No':'Sí'}</td>
+      <td style="text-align:right"><button class="btn sec sm" onclick="memberForm('${m.id}')">Editar</button></td></tr>`).join('')}
+  </table>`:'<div class="empty">Tu equipo está vacío. Agrega a la primera persona para empezar.</div>'}</div>`;
+}
+function memberForm(id){
+  const m = id ? member(id) : { name:'', group:'Colaboración', role:'', email:'', phone:'', color:COLORS[S.members.length%COLORS.length], vacDays:S.settings.defaultDays, oncall:true, shifts:true, fixed:null };
+  openModal(`<h3>${id?'Editar':'Nuevo'} integrante</h3>
+    <div class="form">
+      <label class="f">Nombre<input id="mName" value="${esc(m.name)}" placeholder="Nombre completo"></label>
+      <label class="f">Grupo<select id="mGroup">${GROUPS.map(g=>`<option ${g===m.group?'selected':''}>${g}</option>`).join('')}</select></label>
+      <label class="f">Puesto / rol<input id="mRole" value="${esc(m.role||'')}" placeholder="Ej. Ingeniero VoIP N2"></label>
+      <label class="f">Correo<input id="mEmail" value="${esc(m.email||'')}"></label>
+      <label class="f">Teléfono<input id="mPhone" value="${esc(m.phone||'')}"></label>
+      <label class="f">Días de vacaciones al año<input type="number" id="mDays" min="0" value="${m.vacDays??S.settings.defaultDays}"></label>
+      <label class="f">Color<input type="color" id="mColor" value="${m.color}" style="height:36px;padding:2px"></label>
+      <label class="full" style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="mOncall" ${m.oncall!==false?'checked':''}> Participa en rotación de guardias</label>
+      <label class="full" style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="mShifts" ${m.shifts!==false?'checked':''}> Participa en la rotación semanal de horarios (Mañana/Mutante/Tarde/Oficina)</label>
+      <div class="full"><label class="f">Horario fijo (si no está en la rotación)</label>
+        <label style="font-size:13px"><input type="checkbox" id="mFixOn" ${m.fixed?'checked':''}> Tiene horario fijo</label>
+        <input type="time" id="mFixS" value="${m.fixed?.start||'08:30'}"> – <input type="time" id="mFixE" value="${m.fixed?.end||'18:30'}">
+        ${DAYS.map((d,i)=>`<label style="font-size:12px;margin-left:6px"><input type="checkbox" class="mFixD" value="${i}" ${(m.fixed?m.fixed.days:[0,1,2,3,4]).includes(i)?'checked':''}>${d}</label>`).join('')}</div>
+    </div>
+    <div class="actions">${id?`<button class="btn bad" style="margin-right:auto" onclick="delMember('${id}')">Eliminar</button>`:''}
+      <button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="saveMember('${id||''}')">Guardar</button></div>`);
+  setTimeout(()=>document.getElementById('mName').focus(),50);
+}
+function saveMember(id){
+  const d = { name:val('mName').trim(), role:val('mRole').trim(), email:val('mEmail').trim(), phone:val('mPhone').trim(), vacDays:+val('mDays')||0, color:val('mColor'), oncall:document.getElementById('mOncall').checked, shifts:document.getElementById('mShifts').checked, group:val('mGroup'),
+    fixed: document.getElementById('mFixOn').checked ? {start:val('mFixS'), end:val('mFixE'), days:[...document.querySelectorAll('.mFixD:checked')].map(x=>+x.value)} : null };
+  if(!d.name) return toast('Escribe el nombre');
+  if(id){ Object.assign(member(id), d); syncRotation(); }
+  else { const nid=uid(); S.members.push({id:nid, ...d}); syncRotation(); }
+  save(); closeModal(); render(); toast('Integrante guardado');
+}
+function delMember(id){
+  if(!confirm(`¿Eliminar a ${mName(id)}? También se borrarán sus guardias y solicitudes.`)) return;
+  S.members=S.members.filter(m=>m.id!==id); S.oncall=S.oncall.filter(g=>g.memberId!==id); S.vacations=S.vacations.filter(v=>v.memberId!==id); syncRotation();
+  save(); closeModal(); render();
+}
+
+/* ================== Vista: Ajustes ================== */
+function settings(){
+  return `
+  <div class="head"><h2>Ajustes</h2></div>
+  <div class="panel"><h3>Reglas</h3>${isEditor?'':'<div class="alert warn">🔒 Solo el editor puede modificar estos valores.</div>'}
+    <div class="form" style="max-width:600px">
+      <label class="f">Máximo de personas ausentes el mismo día<input type="number" min="1" value="${S.settings.maxOff}" ${isEditor?"":"disabled"} onchange="S.settings.maxOff=Math.max(1,+this.value);save();toast('Guardado')"></label>
+      <label class="f">Días de vacaciones por defecto (nuevos integrantes)<input type="number" min="0" value="${S.settings.defaultDays}" ${isEditor?"":"disabled"} onchange="S.settings.defaultDays=+this.value;save();toast('Guardado')"></label>
+    </div></div>
+  <div class="panel"><h3>Datos</h3>
+    <p class="muted">La información se guarda <b>solo en este navegador y en esta computadora</b>. Si borras el historial/datos del navegador o cambias de navegador, se pierde, así que haz un respaldo JSON con regularidad.</p>
+    <div class="toolbar">
+      <button class="btn" onclick="exportJSON()">⬇ Respaldar (JSON)</button>
+      <button class="btn sec" onclick="document.getElementById('importFile').click()">⬆ Restaurar respaldo</button>
+      <button class="btn sec" onclick="exportCSV('vacations')">⬇ Vacaciones CSV</button>
+      <button class="btn sec" onclick="exportCSV('oncall')">⬇ Guardias CSV</button>
+
+    </div>
+    <p class="muted" style="font-size:12px;margin-top:12px">Registros: ${S.members.length} integrantes · ${S.oncall.length} guardias · ${S.vacations.length} solicitudes</p>
+  </div>`;
+}
+function download(name, content, type){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([content],{type})); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+function exportJSON(){ download(`control-equipo-respaldo-${todayS()}.json`, JSON.stringify(S,null,2), 'application/json'); toast('Respaldo descargado'); }
+function importJSON(e){
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!d.members) throw 0; if(!confirm('Esto reemplazará los datos actuales. ¿Continuar?')) return; S=Object.assign(blank(),d,{settings:Object.assign(blank().settings,d.settings||{}),rotation:Object.assign(blank().rotation,d.rotation||{})}); save(); render(); toast('Respaldo restaurado'); }catch(_){ alert('El archivo no es un respaldo válido.'); } e.target.value=''; };
+  r.readAsText(f);
+}
+function exportCSV(kind){
+  const q = s => `"${String(s??'').replace(/"/g,'""')}"`;
+  let rows;
+  if(kind==='vacations') rows=[['Integrante','Grupo','Tipo','Desde','Hasta','Hora inicio','Hora fin','Duración','Estado','Solicitada','Notas'], ...S.vacations.map(v=>[mName(v.memberId),member(v.memberId)?.group||'',v.type,v.start,v.end,v.tStart||'',v.tEnd||'',vacDur(v),v.status,v.requestedAt,v.notes])];
+  else rows=[['Integrante','Equipo','Tipo','Desde','Hasta','Notas'], ...S.oncall.map(g=>[mName(g.memberId),g.team||'',g.type,g.start,g.end,g.notes])];
+  download(`${kind==='vacations'?'vacaciones':'guardias'}-${todayS()}.csv`, '﻿'+rows.map(r=>r.map(q).join(',')).join('\r\n'), 'text/csv;charset=utf-8');
+}
+function resetAll(){ if(!confirm('¿Borrar TODOS los datos? Esta acción no se puede deshacer.')) return; S=seedTeam(blank()); save(); render(); toast('Datos borrados'); }
+function loadDemo(){
+  if(S.members.length && !confirm('Se agregarán los 9 ingenieros del Área de Colaboración a los existentes. ¿Continuar?')) return;
+  const fresh=seedTeam(blank()); S.members.push(...fresh.members); S.rotation.order.push(...fresh.rotation.order); if(!S.rotation.positions.length) S.rotation.positions=fresh.rotation.positions; syncRotation(); save(); render(); toast('Equipo cargado');
+}
+
+function migrate(){
+  if(S.mig3) return;
+  S.members.forEach(m=>{ if(m.name==='Mayra Gabriela (Gabi)') m.name='Mayra Carrasco'; if(m.vacDays===12) m.vacDays=18; });
+  if(S.settings.defaultDays===12) S.settings.defaultDays=18;
+  S.oncall.forEach(g=>{ if(g.notes==='Continuación de la rotación MM') g.notes=''; });
+  S.mig3=true; save();
+}
+S = load(); migrate();
+render();
+
+/* ================== Inicio de sesión y sincronización ================== */
+function setSync(t){ const el=document.getElementById('syncState'); if(el) el.textContent=t; }
+function showLogin(msg){
+  document.getElementById('login').classList.add('show'); document.body.classList.add('locked');
+  document.getElementById('loginErr').textContent = msg||'';
+}
+function hideLogin(){ document.getElementById('login').classList.remove('show'); document.body.classList.remove('locked'); }
+const AUTH_ERR = { 'auth/invalid-credential':'Correo o contraseña incorrectos.', 'auth/wrong-password':'Correo o contraseña incorrectos.', 'auth/user-not-found':'Correo o contraseña incorrectos.', 'auth/invalid-email':'El correo no es válido.', 'auth/too-many-requests':'Demasiados intentos. Espera unos minutos.', 'auth/network-request-failed':'Sin conexión a internet.', 'auth/user-disabled':'Esta cuenta está deshabilitada.' };
+function doLogin(e){
+  e.preventDefault();
+  const em=document.getElementById('lEmail').value.trim(), pw=document.getElementById('lPass').value;
+  document.getElementById('loginErr').textContent='Entrando…';
+  firebase.auth().signInWithEmailAndPassword(em,pw).catch(err=>{ document.getElementById('loginErr').textContent = AUTH_ERR[err.code] || err.message; });
+  return false;
+}
+function doLogout(){ if(dbRef) dbRef.off(); dbRef=null; firebase.auth().signOut(); }
+function resetPass(){
+  const em=document.getElementById('lEmail').value.trim(); if(!em) return document.getElementById('loginErr').textContent='Escribe tu correo arriba y vuelve a dar clic.';
+  firebase.auth().sendPasswordResetEmail(em).then(()=>document.getElementById('loginErr').textContent='Te enviamos un correo para cambiar la contraseña.').catch(err=>document.getElementById('loginErr').textContent=AUTH_ERR[err.code]||err.message);
+}
+(function initFirebase(){
+  if(typeof firebase==='undefined'){ showLogin('No se pudo cargar Firebase. Revisa tu conexión a internet y recarga la página.'); return; }
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const auth = firebase.auth();
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>auth.setPersistence(firebase.auth.Auth.Persistence.NONE));
+  showLogin('');
+  auth.onAuthStateChanged(user=>{
+    fbUser = user;
+    if(!user){ isEditor=false; document.body.classList.remove('ro'); showLogin(''); return; }
+    isEditor = user.uid === EDITOR_UID;
+    document.body.classList.toggle('ro', !isEditor);
+    document.getElementById('whoami').innerHTML = `${esc(user.email)}<br><b>${isEditor?'✏️ Editor':'👁 Solo lectura'}</b>`;
+    hideLogin(); setSync('Conectando…');
+    dbRef = firebase.database().ref(DB_PATH);
+    dbRef.on('value', snap=>{
+      const v = snap.val();
+      if(v){ lastRemote = v; applyingRemote=true; S = hydrate(v); rotCache=new Map(); try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} render(); applyingRemote=false; setSync('✓ Sincronizado'); }
+      else if(isEditor){ save(); toast('Datos subidos a la nube por primera vez'); }
+      else { setSync('Sin datos todavía'); }
+    }, err=>{ setSync('⚠ Sin permiso'); toast('No tienes permiso para ver los datos ('+err.code+').'); });
+  });
+})();
+</script>
+</body>
+</html>
