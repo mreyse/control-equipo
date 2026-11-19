@@ -760,14 +760,14 @@ function oncall(){
       <button class="btn" onclick="gdForm()">+ Guardia</button>
     </div></div>
   ${needTeam()}
-  <div class="grid2 gdgrid">
+  <div class="${isEditor?'grid2 gdgrid':''}">
   <div class="panel"><h3>🚨 Rotación completa · ${N} semanas</h3>
     <p class="muted" style="margin-top:-6px">Del ${nice(fd(mon))} al ${nice(fd(last))}. Una vuelta completa de los ${N} integrantes de guardia de Colaboración; MM rota en las mismas semanas.${isEditor?' Clic en una guardia para editarla, o en «Sin asignar» para asignarla.':''}</p>
     ${guardTimeline(t, {weeks:N, teams, member:ui.gdMember, clickable:true, notes:true, bare:true})}
   </div>
-  <div class="panel"><h3>Guardias por persona (${yr})</h3>
+  ${isEditor?`<div class="panel"><h3>Guardias por persona (${yr})</h3>
     ${counts.length?`<table>${counts.map(x=>`<tr><td><span class="dot" style="background:${x.m.color}"></span>${esc(x.m.name)} <span class="muted" style="font-size:11px">${esc(x.m.group||'')}</span></td><td style="text-align:right"><b>${x.n}</b></td></tr>`).join('')}</table><p class="muted" style="font-size:12px">Ordenado de menos a más, útil para repartir de forma equitativa.</p>`:'<div class="empty">—</div>'}
-  </div></div>`;
+  </div>`:''}</div>`;
 }
 function gdForm(id, pre){
   if(!S.members.length){ go('team'); return toast('Agrega primero a tu equipo'); }
