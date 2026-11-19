@@ -373,8 +373,9 @@ function usedDays(mid, year){
     .reduce((t,v)=>t+businessDays(v.start,v.end),0);
 }
 function pendingDays(mid, year){
-  return S.vacations.filter(v=>v.memberId===mid && v.status==='Pendiente' && v.type==='Vacaciones' && v.start.slice(0,4)==String(year))
-    .reduce((t,v)=>t+businessDays(v.start,v.end),0);
+  const a = S.vacations.filter(v=>v.memberId===mid && v.status==='Pendiente' && v.type==='Vacaciones' && v.start.slice(0,4)==String(year)).reduce((t,v)=>t+businessDays(v.start,v.end),0);
+  const b = (typeof reqList==='function' ? reqList() : []).filter(r=>r.kind==='vac' && r.memberId===mid && r.status==='Pendiente' && r.type==='Vacaciones' && r.start.slice(0,4)==String(year)).reduce((t,r)=>t+businessDays(r.start,r.end),0);
+  return a+b;
 }
 const isHX = v => v.type===HX;
 const hxHours = v => (v.tStart&&v.tEnd) ? hoursBetween(v.tStart,v.tEnd) : 0;
@@ -435,7 +436,130 @@ function needTeam(){ return S.members.length ? '' : `<div class="panel empty">Pr
 
 document.querySelectorAll('.nav').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)));
 function go(v){ ui.view=v; document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active', b.dataset.view===v)); render(); }
-function renderBadge(){ const n = S.vacations.filter(v=>v.status==='Pendiente').length; const b=document.getElementById('pendBadge'); b.textContent=n; b.classList.toggle('hidden', !n); }
+/* ================== Solicitudes de usuarios (vacaciones e intercambios) ================== */
+let requests = {}, reqRef = null;
+const reqList = () => Object.entries(requests||{}).map(([id,r])=>Object.assign({id}, r));
+const REQ_COLORS = { 'Pendiente':['#fff4dc','#8a5a00'], 'Esperando compañero':['#e8f0fe','#1f4fb8'], 'Por aprobar':['#fff4dc','#8a5a00'], 'Aprobada':['#e3f6eb','#17663a'], 'Rechazada':['#fde8e8','#9b2c2c'], 'Cancelada':['#eee','#777'] };
+const reqPill = st => { const c=REQ_COLORS[st]||['#eee','#555']; return `<span class="pill" style="background:${c[0]};color:${c[1]}">${esc(st)}</span>`; };
+const reqNeedsAdmin = r => (r.kind==='vac' && r.status==='Pendiente') || (r.kind==='swap' && r.status==='Por aprobar');
+const reqIncoming = r => { const me=myMember(); return !!me && r.kind==='swap' && r.status==='Esperando compañero' && r.targetMemberId===me.id; };
+const reqMine = r => { const me=myMember(); return (fbUser && r.uid===fbUser.uid) || (!!me && r.memberId===me.id); };
+function reqDesc(r){
+  if(r.kind==='vac') return `<b>${esc(r.type)}</b> · ${r.type===HX?`${nice(r.start)} ${r.tStart||''}–${r.tEnd||''}`:`${nice(r.start)} – ${nice(r.end)} (${businessDays(r.start,r.end)} día(s))`}${r.notes?`<br><span class="muted" style="font-size:12px">${esc(r.notes)}</span>`:''}`;
+  const same = r.myDate===r.targetDate;
+  return `<b>🔄 Intercambio</b> con <b>${esc(mName(r.targetMemberId))}</b><br><span style="font-size:12px">${esc(mName(r.memberId).split(' ')[0])}: ${nice(r.myDate)} (${esc(r.myShiftA||'')}) ⇄ ${esc(mName(r.targetMemberId).split(' ')[0])}: ${same?'mismo día':nice(r.targetDate)} (${esc(same?(r.targetShiftA||''):(r.targetShiftB||''))})</span>${r.notes?`<br><span class="muted" style="font-size:12px">${esc(r.notes)}</span>`:''}`;
+}
+function reqActions(r){
+  const b=[];
+  if(isEditor && reqNeedsAdmin(r)) b.push(`<button class="btn ok sm" onclick="reqAct('${r.id}','approve')">Aprobar</button>`,`<button class="btn bad sm" onclick="reqAct('${r.id}','reject')">Rechazar</button>`);
+  if(reqIncoming(r)) b.push(`<button class="btn ok sm" onclick="reqAct('${r.id}','accept')">Aceptar</button>`,`<button class="btn bad sm" onclick="reqAct('${r.id}','decline')">Rechazar</button>`);
+  if(reqMine(r) && ['Pendiente','Esperando compañero','Por aprobar'].includes(r.status)) b.push(`<button class="btn sec sm" onclick="reqAct('${r.id}','cancel')">Cancelar</button>`);
+  return b.join(' ');
+}
+function reqRows(list, showWho){
+  return list.length ? `<table>${list.map(r=>`<tr><td>${showWho?`<span class="dot" style="background:${mColor(r.memberId)}"></span><b>${esc(mName(r.memberId))}</b><br>`:''}${reqDesc(r)}</td><td style="white-space:nowrap">${reqPill(r.status)}<br><span class="muted" style="font-size:11px">${nice(r.createdAt||'')}</span></td><td style="text-align:right;white-space:nowrap">${reqActions(r)}</td></tr>`).join('')}</table>` : '';
+}
+function myRequestsPanel(){
+  const me=myMember();
+  if(!me) return `<div class="empty">Tu usuario no está vinculado a un integrante, así que no puedes enviar solicitudes. Pide al administrador que registre tu correo en tu ficha de Equipo.</div>`;
+  const inc = reqList().filter(reqIncoming);
+  const mine = reqList().filter(reqMine).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).slice(0,10);
+  return `${inc.length?`<div class="alert warn" style="margin-bottom:8px">🔄 Tienes ${inc.length} solicitud(es) de intercambio esperando tu respuesta</div>${reqRows(inc,true)}`:''}
+    <div class="toolbar" style="margin:${inc.length?'12px':'0'} 0 8px"><button class="btn sm" onclick="reqVacation()">+ Solicitar ausencia</button><button class="btn sec sm" onclick="reqSwap()">🔄 Intercambiar turno</button></div>
+    ${mine.length?reqRows(mine,false):'<div class="empty">Aún no has enviado solicitudes.</div>'}`;
+}
+function adminRequestsHTML(){ const list=reqList().filter(reqNeedsAdmin).sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||'')); return reqRows(list,true); }
+
+/* ---- Formularios ---- */
+function reqVacation(){
+  const me=myMember(); if(!me) return toast('Tu usuario no está vinculado a un integrante');
+  openModal(`<h3>Solicitar ausencia</h3><p class="muted" style="margin-top:0">${esc(me.name)} · la solicitud llega al administrador para su aprobación.</p>
+    <div class="form">
+      <label class="f">Tipo<select id="rqType" onchange="rqPrev()">${VAC_TYPES.map(t=>`<option>${t}</option>`).join('')}</select></label>
+      <label class="f"><span id="rqL">Desde</span><input type="date" id="rqStart" value="${todayS()}" onchange="rqPrev()"></label>
+      <label class="f rq-nohx">Hasta<input type="date" id="rqEnd" value="${todayS()}" onchange="rqPrev()"></label>
+      <label class="f rq-hx">Hora inicio<input type="time" id="rqTS" value="18:00" onchange="rqPrev()"></label>
+      <label class="f rq-hx">Hora fin<input type="time" id="rqTE" value="20:00" onchange="rqPrev()"></label>
+      <label class="f full">Comentarios<textarea id="rqNotes" placeholder="Ej. quién me cubre, motivo…"></textarea></label>
+    </div><div id="rqPrev"></div>
+    <div class="actions"><button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="sendVacReq()">Enviar solicitud</button></div>`);
+  rqPrev();
+}
+function readRq(){ const me=myMember(), t=val('rqType'), hx=t===HX; return { memberId:me.id, type:t, start:val('rqStart'), end:hx?val('rqStart'):val('rqEnd'), tStart:hx?val('rqTS'):null, tEnd:hx?val('rqTE'):null, notes:val('rqNotes').trim(), status:'Pendiente', id:'_req' }; }
+function rqPrev(){
+  const v=readRq(), hx=isHX(v);
+  document.querySelectorAll('#modal .rq-hx').forEach(x=>x.style.display=hx?'':'none');
+  document.querySelectorAll('#modal .rq-nohx').forEach(x=>x.style.display=hx?'none':'');
+  document.getElementById('rqL').textContent = hx?'Día':'Desde';
+  const el=document.getElementById('rqPrev');
+  if(v.end<v.start) return el.innerHTML='<div class="alert bad">La fecha final es anterior a la inicial.</div>';
+  if(hx) return el.innerHTML = v.tStart&&v.tEnd?`<div class="alert ok">⏱ ${fmtH(hoursBetween(v.tStart,v.tEnd))} de horas extras.</div>`:'';
+  const yr=v.start.slice(0,4), tot=member(v.memberId).vacDays??S.settings.defaultDays, used=usedDays(v.memberId,yr), d=businessDays(v.start,v.end);
+  el.innerHTML = `<div class="alert ok">📆 ${d} día(s) hábil(es).${v.type==='Vacaciones'?` Te quedarían ${tot-used-d} de ${tot} días en ${yr}.`:''}</div>`;
+}
+function sendVacReq(){
+  const v=readRq(); if(!v.start||!v.end||v.end<v.start) return toast('Revisa las fechas');
+  if(isHX(v) && (!v.tStart||!v.tEnd)) return toast('Indica las horas');
+  const r = {kind:'vac', uid:fbUser.uid, email:(fbUser.email||'').toLowerCase(), memberId:v.memberId, type:v.type, start:v.start, end:v.end, notes:v.notes, status:'Pendiente', createdAt:todayS()};
+  if(isHX(v)){ r.tStart=v.tStart; r.tEnd=v.tEnd; }
+  firebase.database().ref('requests').push(r).then(()=>{ closeModal(); toast('Solicitud enviada'); }).catch(e=>toast('No se pudo enviar: '+e.message));
+}
+function reqSwap(){
+  const me=myMember(); if(!me) return toast('Tu usuario no está vinculado a un integrante');
+  if(!S.rotation.order.includes(me.id)) return toast('Los intercambios son para quienes están en la rotación de turnos');
+  const mates = S.members.filter(m=>m.id!==me.id && S.rotation.order.includes(m.id));
+  openModal(`<h3>🔄 Intercambiar turno</h3><p class="muted" style="margin-top:0">Tu compañero debe aceptar y después el administrador lo aprueba. Si eligen fechas distintas, se intercambian los turnos de ambos días.</p>
+    <div class="form">
+      <label class="f">Mi día<input type="date" id="swA" value="${todayS()}" onchange="swPrev()"></label>
+      <label class="f">Compañero<select id="swM" onchange="swPrev()">${mates.map(m=>`<option value="${m.id}" ${m.email?'':'disabled'}>${esc(m.name)}${m.email?'':' (sin acceso)'}</option>`).join('')}</select></label>
+      <label class="f">Día de mi compañero<input type="date" id="swB" value="${todayS()}" onchange="swPrev()"></label>
+      <label class="f">Comentarios<input id="swN" placeholder="Opcional"></label>
+    </div><div id="swPrev"></div>
+    <div class="actions"><button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="sendSwap()">Enviar a mi compañero</button></div>`);
+  swPrev();
+}
+function swData(){ const me=myMember(), A=val('swA'), B=val('swB'), T=val('swM'); return {me:me.id, T, A, B, myA:shiftOf(me.id,A), tA:shiftOf(T,A), myB:shiftOf(me.id,B), tB:shiftOf(T,B)}; }
+function swPrev(){
+  const d=swData(), el=document.getElementById('swPrev'); if(!d.T) return el.innerHTML='';
+  const tn=mName(d.T).split(' ')[0], line=(day,a,b)=>`<div>📅 <b>${DAYS[dow(pd(day))]} ${nice(day)}</b>: tú <b>${esc(a)}</b> → <b>${esc(b)}</b> · ${esc(tn)} <b>${esc(b)}</b> → <b>${esc(a)}</b></div>`;
+  if(d.A===d.B && d.myA===d.tA) return el.innerHTML=`<div class="alert warn">Ese día los dos tienen <b>${esc(d.myA)}</b>; no hay nada que intercambiar.</div>`;
+  el.innerHTML = `<div class="alert ok">${line(d.A,d.myA,d.tA)}${d.A!==d.B?line(d.B,d.myB,d.tB):''}</div>`;
+}
+function sendSwap(){
+  const d=swData(), t=member(d.T); if(!t) return toast('Elige a tu compañero');
+  if(!t.email) return toast('Tu compañero no tiene acceso vinculado');
+  if(d.A===d.B && d.myA===d.tA) return toast('No hay nada que intercambiar');
+  const r={kind:'swap', uid:fbUser.uid, email:(fbUser.email||'').toLowerCase(), memberId:d.me, targetMemberId:d.T, targetEmail:t.email.trim().toLowerCase(), myDate:d.A, targetDate:d.B, myShiftA:d.myA, targetShiftA:d.tA, myShiftB:d.myB, targetShiftB:d.tB, notes:val('swN').trim(), status:'Esperando compañero', createdAt:todayS()};
+  firebase.database().ref('requests').push(r).then(()=>{ closeModal(); toast('Solicitud enviada a '+t.name.split(' ')[0]); }).catch(e=>toast('No se pudo enviar: '+e.message));
+}
+/* ---- Acciones ---- */
+function reqAct(id, action){
+  const r = Object.assign({id}, requests[id]); if(!r.kind) return;
+  const ref = firebase.database().ref('requests/'+id), who=(fbUser?.email||'').toLowerCase();
+  const upd = o => ref.update(Object.assign({updatedAt:todayS(), updatedBy:who}, o)).then(()=>toast('Listo')).catch(e=>toast('No se pudo: '+e.message));
+  if(action==='accept') return upd({status:'Por aprobar'});
+  if(action==='decline') return upd({status:'Rechazada', reason:'Rechazada por el compañero'});
+  if(action==='cancel'){ if(!confirm('¿Cancelar esta solicitud?')) return; return upd({status:'Cancelada'}); }
+  if(action==='reject'){ if(!isEditor) return; return upd({status:'Rechazada', reason:'Rechazada por administrador'}); }
+  if(action==='approve'){
+    if(!isEditor) return;
+    if(r.kind==='vac'){
+      const v={id:uid(), memberId:r.memberId, type:r.type, start:r.start, end:r.end, status:'Aprobada', requestedAt:r.createdAt||todayS(), decidedAt:todayS(), notes:r.notes||'', fromRequest:id};
+      if(r.tStart){ v.tStart=r.tStart; v.tEnd=r.tEnd; }
+      const c=vacConflicts(v); if(c.length && !confirm('Esta solicitud tiene alertas:\n\n• '+c.map(x=>x.msg).join('\n• ')+'\n\n¿Aprobar de todos modos?')) return;
+      S.vacations.push(v); save();
+    } else {
+      const me=r.memberId, T=r.targetMemberId, tn=mName(T).split(' ')[0], mn=mName(me).split(' ')[0];
+      const swapDay = day => { const a=shiftOf(me,day), b=shiftOf(T,day);
+        S.rotation.overrides[me+'|'+day]={shift:b, note:'Intercambio con '+tn}; S.rotation.overrides[T+'|'+day]={shift:a, note:'Intercambio con '+mn}; };
+      swapDay(r.myDate); if(r.targetDate!==r.myDate) swapDay(r.targetDate);
+      save();
+    }
+    return upd({status:'Aprobada'});
+  }
+}
+
+function renderBadge(){ const n = S.vacations.filter(v=>v.status==='Pendiente').length + (isEditor ? reqList().filter(reqNeedsAdmin).length : reqList().filter(reqIncoming).length); const b=document.getElementById('pendBadge'); b.textContent=n; b.classList.toggle('hidden', !n); }
 function isMobile(){ return window.matchMedia('(max-width:700px)').matches; }
 window.matchMedia('(max-width:700px)').addEventListener('change', ()=>render());
 function render(){ const f = {dashboard,calendar,vacations,oncall,schedules,team,settings}[ui.view]; document.getElementById('main').innerHTML = f(); renderBadge();
@@ -526,7 +650,7 @@ function dashboard(){
   ${needTeam()}
   <div class="grid4">
     <div class="kpi"><div class="n">${S.members.length}</div><div class="l">Integrantes</div></div>
-    <div class="kpi"><div class="n" style="color:var(--warn)">${pend.length}</div><div class="l">Solicitudes pendientes</div></div>
+    <div class="kpi"><div class="n" style="color:var(--warn)">${pend.length + (isEditor ? reqList().filter(reqNeedsAdmin).length : reqList().filter(r=>(reqMine(r)&&['Pendiente','Esperando compañero','Por aprobar'].includes(r.status))||reqIncoming(r)).length)}</div><div class="l">${isEditor?'Solicitudes pendientes':'Mis solicitudes en trámite'}</div></div>
     <div class="kpi"><div class="n">${offToday.length}</div><div class="l">Ausentes hoy</div>${offToday.length?`<div style="margin-top:6px;font-size:13px">${offToday.map(v=>`<div><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))} <span class="muted" style="font-size:11px">(${esc(v.type)}${v.end>t?` · hasta ${nice(v.end)}`:''})</span></div>`).join('')}</div>`:''}</div>
     <div class="kpi"><div class="n" style="font-size:16px;padding-top:6px">${gdToday.length?gdToday.map(g=>`<span class="dot" style="background:${mColor(g.memberId)}"></span>${esc(mName(g.memberId))} <span class="muted" style="font-size:12px">(${esc(g.team||g.type)})</span>`).join('<br>'):'<span class="muted">Sin asignar</span>'}</div><div class="l">De guardia hoy</div></div>
   </div>
@@ -540,10 +664,11 @@ function dashboard(){
       ${upcoming.length? `<table>${upcoming.map(v=>`<tr><td><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))}</td><td>${esc(v.type)}</td><td class="muted">${nice(v.start)} – ${nice(v.end)}</td></tr>`).join('')}</table>` : '<div class="empty">Nadie ausente en los próximos 30 días</div>'}
     </div>
   <div class="grid2">
-    <div class="panel"><h3>Pendientes de aprobar</h3>
+    ${isEditor?`<div class="panel"><h3>Pendientes de aprobar</h3>
+      ${adminRequestsHTML()}
       ${pend.length? `<table>${pend.map(v=>`<tr><td><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))}<br><span class="muted">${esc(v.type)} · ${vacWhen(v)} · ${vacDur(v)}</span></td>
-        <td style="text-align:right;white-space:nowrap"><button class="btn ok sm" onclick="setStatus('${v.id}','Aprobada')">Aprobar</button> <button class="btn bad sm" onclick="setStatus('${v.id}','Rechazada')">Rechazar</button></td></tr>`).join('')}</table>` : '<div class="empty">No hay solicitudes pendientes 🎉</div>'}
-    </div>
+        <td style="text-align:right;white-space:nowrap"><button class="btn ok sm" onclick="setStatus('${v.id}','Aprobada')">Aprobar</button> <button class="btn bad sm" onclick="setStatus('${v.id}','Rechazada')">Rechazar</button></td></tr>`).join('')}</table>` : (adminRequestsHTML()?'':'<div class="empty">No hay solicitudes pendientes 🎉</div>')}
+    </div>`:`<div class="panel"><h3>Mis solicitudes</h3>${myRequestsPanel()}</div>`}
     <div class="panel"><h3>${isEditor?'Saldo de vacaciones':'Mi saldo de vacaciones'} ${yr}</h3>
       ${(()=>{ const rows = isEditor ? S.members : (myMember()?[myMember()]:[]); if(!isEditor && !rows.length) return `<div class="empty">Tu usuario (${esc(fbUser?.email||'')}) no está vinculado a ningún integrante.<br>Pide al administrador que registre ese correo en tu ficha de Equipo.</div>`; return ''; })()}
       ${(isEditor ? S.members : (myMember()?[myMember()]:[])).length? `<table><tr><th>Integrante</th><th>Usados</th><th>Pend.</th><th>Disp.</th><th></th></tr>${(isEditor ? S.members : [myMember()]).map(m=>{ const tot=m.vacDays??S.settings.defaultDays, u=usedDays(m.id,yr), p=pendingDays(m.id,yr); return `<tr><td><span class="dot" style="background:${m.color}"></span>${esc(m.name)}</td><td>${u}</td><td>${p}</td><td><b style="color:${tot-u<0?'var(--bad)':'inherit'}">${tot-u}</b> / ${tot}</td><td><div class="bar"><i style="width:${Math.min(100,u/Math.max(tot,1)*100)}%;background:${m.color}"></i></div></td></tr>`;}).join('')}</table>` : ''}
@@ -558,7 +683,7 @@ function dayData(s){
   return {
     hol: holidayOn(s),
     gds: ui.calGuards ? guardOn(s).filter(flt) : [],
-    vacs: offOn(s,true).filter(flt),
+    vacs: offOn(s,true).filter(flt).concat(reqList().filter(r=>r.kind==='vac' && r.type!==HX && r.status==='Pendiente' && inRange(s,r.start,r.end)).map(r=>({id:'r_'+r.id, memberId:r.memberId, type:r.type, start:r.start, end:r.end, status:'Pendiente', req:true})).filter(flt)),
     hxs: S.vacations.filter(v=>isHX(v) && v.start===s && ['Aprobada','Pendiente'].includes(v.status)).filter(flt),
     offCount: offOn(s).length
   };
@@ -589,12 +714,12 @@ function chipsFull(s, D, compact){
   const gChips = D.gds.map(g=>{
     const v = D.vacs.find(x=>x.memberId===g.memberId);
     if(v){ merged.add(v.id);
-      return `<span class="chip gd" style="border-color:${mColor(g.memberId)}" title="Guardia ${esc(g.team||'')} + ${esc(v.type)} (${v.status})" onclick="vacForm('${v.id}')">🚨${vacIcon(v)} ${compact?'':'Guardia '+esc(g.team||'')+' · '+esc(v.type)+(v.status==='Pendiente'?' (pendiente)':'')+': '}${esc(mName(g.memberId))}</span>`; }
+      return `<span class="chip gd" style="border-color:${mColor(g.memberId)}" title="Guardia ${esc(g.team||'')} + ${esc(v.type)} (${v.status})" ${v.req?'':`onclick="vacForm('${v.id}')"`}>🚨${vacIcon(v)} ${compact?'':'Guardia '+esc(g.team||'')+' · '+esc(v.type)+(v.status==='Pendiente'?' (pendiente)':'')+': '}${esc(mName(g.memberId))}</span>`; }
     return `<span class="chip gd" style="border-color:${mColor(g.memberId)}" title="Guardia ${esc(g.team||'')}">🚨 ${compact?'':'Guardia '+esc(g.team||'')+': '}${esc(mName(g.memberId))}</span>`;
   }).join('');
   return `${D.hol?`<span class="chip holc">🎉 ${esc(D.hol.name)}</span>`:''}
     ${gChips}
-    ${D.vacs.filter(v=>!merged.has(v.id)).map(v=>`<span class="chip vac ${v.status==='Pendiente'?'vpend':''}" style="border-left-color:${mColor(v.memberId)}" title="${esc(v.type)} (${v.status})" onclick="vacForm('${v.id}')">${vacIcon(v)} ${esc(mName(v.memberId))}${compact?'':' · '+esc(v.type)+(v.status==='Pendiente'?' (pendiente)':'')}</span>`).join('')}
+    ${D.vacs.filter(v=>!merged.has(v.id)).map(v=>`<span class="chip vac ${v.status==='Pendiente'?'vpend':''}" style="border-left-color:${mColor(v.memberId)}" title="${esc(v.type)} (${v.status})" ${v.req?'':`onclick="vacForm('${v.id}')"`}>${vacIcon(v)} ${esc(mName(v.memberId))}${compact?'':' · '+esc(v.type)+(v.status==='Pendiente'?' (pendiente)':'')}</span>`).join('')}
     ${D.hxs.map(v=>`<span class="chip hx ${v.status==='Pendiente'?'pend':''}" style="border-color:${mColor(v.memberId)}" title="${HX} (${v.status})" onclick="vacForm('${v.id}')">⏱ ${esc(mName(v.memberId))} ${v.tStart||''}–${v.tEnd||''}</span>`).join('')}`;
 }
 function coverageHTML(s, full){
@@ -648,7 +773,7 @@ function calendar(){
         ${sec('🕘 Turnos', coverageHTML(s,true) || '<span class="muted">Nadie programado</span>')}
         <div>
           ${sec('🚨 Guardia', D.gds.length ? D.gds.map(g=>`<div style="margin-bottom:4px"><span class="dot" style="background:${mColor(g.memberId)}"></span><b>${esc(mName(g.memberId))}</b> <span class="muted">· ${esc(g.team||'')} · ${nice(g.start)} – ${nice(g.end)}</span></div>`).join('') : `<span class="muted">${ui.calGuards?'Sin guardia':'Guardias ocultas'}</span>`)}
-          ${sec('🌴 Ausencias', D.vacs.length ? D.vacs.map(v=>`<div style="margin-bottom:4px;cursor:pointer" onclick="vacForm('${v.id}')"><span class="dot" style="background:${mColor(v.memberId)}"></span><b>${esc(mName(v.memberId))}</b> <span class="muted">· ${esc(v.type)} · ${nice(v.start)} – ${nice(v.end)}</span> <span class="pill ${v.status}">${v.status}</span></div>`).join('') : '<span class="muted">Nadie ausente</span>')}
+          ${sec('🌴 Ausencias', D.vacs.length ? D.vacs.map(v=>`<div style="margin-bottom:4px;${v.req?'':'cursor:pointer'}" ${v.req?'':`onclick="vacForm('${v.id}')"`}><span class="dot" style="background:${mColor(v.memberId)}"></span><b>${esc(mName(v.memberId))}</b> <span class="muted">· ${esc(v.type)} · ${nice(v.start)} – ${nice(v.end)}</span> <span class="pill ${v.status}">${v.status}</span></div>`).join('') : '<span class="muted">Nadie ausente</span>')}
           ${D.hxs.length?sec('⏱ Horas extras', D.hxs.map(v=>`<div><span class="dot" style="background:${mColor(v.memberId)}"></span><b>${esc(mName(v.memberId))}</b> <span class="muted">· ${v.tStart}–${v.tEnd} · ${vacDur(v)}</span> <span class="pill ${v.status}">${v.status}</span></div>`).join('')):''}
         </div>
       </div>`;
@@ -711,8 +836,12 @@ function vacations(){
       <select onchange="ui.vacMember=this.value;render()">${groupMemberOptions(ui.vacMember)}</select>
       <button class="btn sec" onclick="exportCSV('vacations')">⬇ CSV</button>
       <button class="btn" onclick="vacForm()">+ Nueva solicitud</button>
+      ${!isEditor&&myMember()?'<button class="btn" onclick="reqVacation()">+ Solicitar ausencia</button>':''}
+      ${myMember()&&S.rotation.order.includes(myMember().id)?'<button class="btn sec" onclick="reqSwap()">🔄 Intercambiar turno</button>':''}
     </div></div>
   ${needTeam()}
+  ${isEditor ? (()=>{ const all=reqList().sort((a,b)=>(reqNeedsAdmin(b)-reqNeedsAdmin(a)) || (b.createdAt||'').localeCompare(a.createdAt||'')).slice(0,30); return all.length?`<div class="panel"><h3>📨 Solicitudes del equipo</h3>${reqRows(all,true)}</div>`:''; })()
+             : `<div class="panel"><h3>📨 Mis solicitudes</h3>${myRequestsPanel()}</div>`}
   <div class="panel">${list.length?`<table>
     <tr><th>Integrante</th><th>Tipo</th><th>Fechas</th><th>Duración</th><th>Estado</th><th>Solicitada</th>${isEditor?'<th>Alertas</th>':''}<th></th></tr>
     ${list.map(v=>{ const c=['Aprobada','Pendiente'].includes(v.status)?vacConflicts(v):[]; return `<tr>
@@ -729,6 +858,7 @@ function vacations(){
   </table>`:'<div class="empty">No hay solicitudes con este filtro.</div>'}</div>`;
 }
 function vacForm(id){
+  if(id && !S.vacations.find(x=>x.id===id)) return;
   if(!S.members.length){ go('team'); return toast('Agrega primero a tu equipo'); }
   const v = id ? S.vacations.find(x=>x.id===id) : { memberId:S.members[0].id, type:'Vacaciones', start:todayS(), end:todayS(), status:'Pendiente', requestedAt:todayS(), notes:'' };
   openModal(`<h3>${id?'Editar':'Nueva'} solicitud</h3>
@@ -942,6 +1072,7 @@ function schedules(){
       <b>Semana del ${nice(week[0])}</b>
       <button class="btn sec" onclick="ui.weekOff=(ui.weekOff||0)+1;render()">▶</button>
       <button class="btn sec" onclick="ui.weekOff=0;render()">Actual</button>
+      ${myMember()&&S.rotation.order.includes(myMember().id)?'<button class="btn sec" onclick="reqSwap()">🔄 Intercambiar turno</button>':''}
       <button class="btn sec" onclick="exportWeekCSV()">⬇ Semana CSV</button>
       <button class="btn" onclick="rotForm()">⚙️ Configurar rotación</button>
     </div></div>
@@ -1199,7 +1330,7 @@ function delEditor(uid){
   if(!confirm('¿Quitar permisos de administrador a '+(editors[uid]?.name||uid)+'?')) return;
   firebase.database().ref('editors/'+uid).remove().then(()=>toast('Permisos retirados')).catch(e=>toast('No se pudo quitar: '+e.message));
 }
-function doLogout(){ if(dbRef) dbRef.off(); dbRef=null; if(edRef) edRef.off(); edRef=null; editors={}; firebase.auth().signOut(); }
+function doLogout(){ if(dbRef) dbRef.off(); dbRef=null; if(reqRef) reqRef.off(); reqRef=null; requests={}; if(edRef) edRef.off(); edRef=null; editors={}; firebase.auth().signOut(); }
 function resetPass(){
   const em=document.getElementById('lEmail').value.trim(); if(!em) return document.getElementById('loginErr').textContent='Escribe tu correo arriba y vuelve a dar clic.';
   firebase.auth().sendPasswordResetEmail(em).then(()=>document.getElementById('loginErr').textContent='Te enviamos un correo para cambiar la contraseña.').catch(err=>document.getElementById('loginErr').textContent=AUTH_ERR[err.code]||err.message);
@@ -1221,6 +1352,8 @@ function resetPass(){
     };
     applyRole();
     hideLogin(); setSync('Conectando…');
+    reqRef = firebase.database().ref('requests');
+    reqRef.on('value', snap=>{ requests = snap.val()||{}; render(); }, ()=>{ requests={}; });
     edRef = firebase.database().ref('editors');
     edRef.on('value', snap=>{ editors = snap.val()||{}; const was=isEditor; applyRole(); if(was!==isEditor || ui.view==='settings') render(); }, ()=>{ editors={}; applyRole(); });
     dbRef = firebase.database().ref(DB_PATH);
