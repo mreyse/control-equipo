@@ -118,6 +118,44 @@ body.ro .edit-only,
 body.ro button[onclick*="Form("],body.ro button[onclick*="setStatus"],body.ro button[onclick*="loadDemo"],body.ro button[onclick*="resetAll"],body.ro button[onclick*="importFile"]{display:none!important}
 body.ro td[onclick*="cellEdit"],body.ro .chip[onclick]{pointer-events:none;cursor:default}
 body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
+@media(min-width:701px){.mrole{display:none}}
+@media(max-width:700px){
+  body{font-size:14px}
+  .app{flex-direction:column}
+  aside{position:fixed;left:0;right:0;bottom:0;width:auto;height:62px;flex-direction:row;padding:4px 4px calc(4px + env(safe-area-inset-bottom));gap:0;z-index:40;box-shadow:0 -2px 10px rgba(0,0,0,.25)}
+  aside h1,aside .spacer,aside .tools,aside .userbox{display:none!important}
+  .nav{position:relative;flex:1;flex-direction:column;justify-content:center;align-items:center;gap:1px;padding:4px 0;font-size:19px;border-radius:8px;min-width:0}
+  .nav .t{display:none}
+  .nav::after{content:attr(data-s);font-size:9.5px;line-height:1.1}
+  .nav .badge{position:absolute;top:1px;right:8%;margin:0;font-size:10px;padding:0 5px}
+  main{padding:14px 10px 84px}
+  .head{margin-bottom:12px}
+  .head h2{font-size:18px;width:100%}
+  .toolbar{width:100%;gap:6px}
+  .toolbar select{flex:1;min-width:0}
+  .toolbar .btn{padding:8px 10px}
+  .hide-m{display:none!important}
+  .grid4{grid-template-columns:1fr 1fr;gap:8px}
+  .grid2{grid-template-columns:1fr!important;gap:0}
+  .kpi{padding:10px 12px}.kpi .n{font-size:22px}
+  .panel{padding:12px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  th,td{padding:7px 6px;font-size:13px}
+  input,select,textarea{font-size:16px}
+  .form{grid-template-columns:1fr}
+  .modal-bg{align-items:flex-end}
+  .modal{width:100vw!important;max-height:92vh;border-radius:14px 14px 0 0;padding:16px}
+  .toast{bottom:84px;left:12px;right:12px;text-align:center}
+  table.xl td.role,table.xl th:first-child{display:none}
+  table.xl td.eng,table.xl tr th:nth-child(2){position:sticky;left:0;z-index:2}
+  table.xl td.eng{background:#fff;font-size:12px}
+  table.xl td.sc{min-width:74px;font-size:12px;padding:5px 4px}
+  .mrole{font-size:10px;color:var(--muted);font-weight:600}
+  .legend{gap:8px 12px}
+}
+.agenda .ad{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.agenda .ad.today{border:2px solid var(--accent)}
+.agenda .ad h4{margin:0 0 6px;font-size:13px;display:flex;justify-content:space-between}
+.agenda .chip{font-size:12px;padding:4px 7px;white-space:normal}
 @media print{aside,.toolbar,button{display:none!important}main{padding:0}}
 </style>
 </head>
@@ -125,13 +163,13 @@ body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
 <div class="app">
   <aside>
     <h1>Control de Equipo<small>Horarios · Guardias · Vacaciones</small></h1>
-    <button class="nav active" data-view="dashboard">📊 <span class="t">Resumen</span></button>
-    <button class="nav" data-view="calendar">📅 <span class="t">Calendario</span></button>
-    <button class="nav" data-view="vacations">🌴 <span class="t">Vacaciones / Ausencias</span><span class="badge hidden" id="pendBadge">0</span></button>
-    <button class="nav" data-view="oncall">🚨 <span class="t">Guardias</span></button>
-    <button class="nav" data-view="schedules">🕘 <span class="t">Horarios</span></button>
-    <button class="nav" data-view="team">👥 <span class="t">Equipo</span></button>
-    <button class="nav" data-view="settings">⚙️ <span class="t">Ajustes</span></button>
+    <button class="nav active" data-view="dashboard" data-s="Resumen">📊 <span class="t">Resumen</span></button>
+    <button class="nav" data-view="calendar" data-s="Calendario">📅 <span class="t">Calendario</span></button>
+    <button class="nav" data-view="vacations" data-s="Ausencias">🌴 <span class="t">Vacaciones / Ausencias</span><span class="badge hidden" id="pendBadge">0</span></button>
+    <button class="nav" data-view="oncall" data-s="Guardias">🚨 <span class="t">Guardias</span></button>
+    <button class="nav" data-view="schedules" data-s="Horarios">🕘 <span class="t">Horarios</span></button>
+    <button class="nav" data-view="team" data-s="Equipo">👥 <span class="t">Equipo</span></button>
+    <button class="nav" data-view="settings" data-s="Ajustes">⚙️ <span class="t">Ajustes</span></button>
     <div class="spacer"></div>
     <div class="userbox"><div id="whoami"></div><div id="syncState" style="margin-top:4px">—</div><button onclick="doLogout()">Cerrar sesión</button></div>
     <div class="tools">
@@ -301,6 +339,8 @@ function needTeam(){ return S.members.length ? '' : `<div class="panel empty">Pr
 document.querySelectorAll('.nav').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)));
 function go(v){ ui.view=v; document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active', b.dataset.view===v)); render(); }
 function renderBadge(){ const n = S.vacations.filter(v=>v.status==='Pendiente').length; const b=document.getElementById('pendBadge'); b.textContent=n; b.classList.toggle('hidden', !n); }
+function isMobile(){ return window.matchMedia('(max-width:700px)').matches; }
+window.matchMedia('(max-width:700px)').addEventListener('change', ()=>render());
 function render(){ const f = {dashboard,calendar,vacations,oncall,schedules,team,settings}[ui.view]; document.getElementById('main').innerHTML = f(); renderBadge();
   if(dbRef && !isEditor) document.querySelectorAll('#main [onchange*="S."],#main [oninput*="S."]').forEach(el=>{ el.disabled=true; el.removeAttribute('onchange'); el.removeAttribute('oninput'); });
 }
@@ -349,7 +389,8 @@ function dashboard(){
 /* ================== Vista: Calendario ================== */
 function calendar(){
   const y=ui.calY, m=ui.calM, first=new Date(y,m,1), start=new Date(first); start.setDate(1-dow(first));
-  const t=todayS(); let cells='';
+  const t=todayS(); let cells='', agenda='';
+  const mobile = isMobile();
   const totalCells = Math.ceil((dow(first)+new Date(y,m+1,0).getDate())/7)*7;
   for(let i=0;i<totalCells;i++){
     const d=new Date(start); d.setDate(start.getDate()+i); const s=fd(d);
@@ -358,6 +399,13 @@ function calendar(){
     const vacs = offOn(s,true).filter(flt);
     const hxs = S.vacations.filter(v=>isHX(v) && v.start===s && ['Aprobada','Pendiente'].includes(v.status)).filter(flt);
     const offCount = offOn(s).length;
+    if(mobile && d.getMonth()===m && (gds.length||vacs.length||hxs.length||s===t)){
+      agenda += `<div class="ad ${s===t?'today':''}"><h4><span>${['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][d.getDay()]} ${d.getDate()}${s===t?' · Hoy':''}</span>${offCount>S.settings.maxOff?`<span class="off" style="color:var(--bad)">${offCount} ausentes</span>`:''}</h4>
+        ${gds.map(g=>`<span class="chip gd" style="border-color:${mColor(g.memberId)}">🚨 Guardia ${esc(g.team||'')}: ${esc(mName(g.memberId))}</span>`).join('')}
+        ${vacs.map(v=>`<span class="chip ${v.status==='Pendiente'?'pend':''}" style="background:${mColor(v.memberId)};border-color:${mColor(v.memberId)}" onclick="vacForm('${v.id}')">${v.status==='Pendiente'?'⏳ ':'🌴 '}${esc(mName(v.memberId))} · ${esc(v.type)}${v.status==='Pendiente'?' (pendiente)':''}</span>`).join('')}
+        ${hxs.map(v=>`<span class="chip hx ${v.status==='Pendiente'?'pend':''}" style="border-color:${mColor(v.memberId)}" onclick="vacForm('${v.id}')">⏱ ${esc(mName(v.memberId))} · horas extras ${v.tStart||''}–${v.tEnd||''}</span>`).join('')}
+        ${!(gds.length||vacs.length||hxs.length)?'<span class="muted" style="font-size:12px">Sin eventos</span>':''}</div>`;
+    }
     cells += `<div class="d ${d.getMonth()!==m?'out':''} ${s===t?'today':''} ${dow(d)>4?'we':''}">
       <div class="num"><span>${d.getDate()}</span>${offCount>S.settings.maxOff?`<span class="off" title="Ausencias por encima del máximo">${offCount} aus.</span>`:''}</div>
       ${gds.map(g=>`<span class="chip gd" style="border-color:${mColor(g.memberId)}" title="Guardia ${esc(g.team||'')} ${esc(g.type)}">🚨 ${esc(mName(g.memberId))}</span>`).join('')}
@@ -369,14 +417,14 @@ function calendar(){
   <div class="head"><h2>Calendario</h2>
     <div class="toolbar">
       <button class="btn sec" onclick="calNav(-1)">◀</button>
-      <b style="min-width:150px;text-align:center">${MONTHS[m]} ${y}</b>
+      <b style="min-width:130px;text-align:center;flex:1">${MONTHS[m]} ${y}</b>
       <button class="btn sec" onclick="calNav(1)">▶</button>
       <button class="btn sec" onclick="calNav(0)">Hoy</button>
       <select onchange="ui.calMember=this.value;render()">${groupMemberOptions(ui.calMember)}</select>
       <label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" ${ui.calGuards?'checked':''} onchange="ui.calGuards=this.checked;render()"> Mostrar guardias</label>
-      <button class="btn sec" onclick="window.print()">🖨 Imprimir</button>
+      <button class="btn sec hide-m" onclick="window.print()">🖨 Imprimir</button>
     </div></div>
-  <div class="cal">${DAYS.map(d=>`<div class="dh">${d}</div>`).join('')}${cells}</div>
+  ${mobile ? `<div class="agenda">${agenda || '<div class="panel empty">Sin eventos este mes</div>'}</div>` : `<div class="cal">${DAYS.map(d=>`<div class="dh">${d}</div>`).join('')}${cells}</div>`}
   <div class="legend">
     <span><i class="sw" style="background:#fff;border-left:4px solid var(--accent);border:1px solid #ccc;border-left-width:4px"></i>🚨 Guardia</span>
     <span><i class="sw" style="background:var(--accent)"></i>🌴 Ausencia aprobada</span>
@@ -622,7 +670,7 @@ function schedules(){
       return `<td class="sc ${s===t?'tday':''}" style="background:${bg}" onclick="cellEdit('${mid}','${s}')" title="${ov?'Cambio manual'+(ov.note?': '+esc(ov.note):''):'Según rol '+esc(pos.name)}">
         ${esc(txt)}${ov?'<sup style="color:var(--accent)">✎</sup>':''}${gd?`<div style="font-size:10px">🚨 Guardia</div>`:''}${warn}</td>`;
     }).join('');
-    return `<tr><td class="role" style="background:${ROLE_COLORS[pos.name]||'#fff'}">${esc(pos.name)}</td><td class="eng"><span class="dot" style="background:${m.color}"></span>${esc(m.name)}</td>${cells}<td><b>${hrs.toFixed(1).replace('.0','')}</b></td></tr>`;
+    return `<tr><td class="role" style="background:${ROLE_COLORS[pos.name]||'#fff'}">${esc(pos.name)}</td><td class="eng"><span class="dot" style="background:${m.color}"></span>${esc(m.name)}<div class="mrole">${esc(pos.name)}</div></td>${cells}<td><b>${hrs.toFixed(1).replace('.0','')}</b></td></tr>`;
   }).join('');
   return `
   <div class="head"><h2>Horarios del equipo</h2>
@@ -777,6 +825,7 @@ function delMember(id){
 function settings(){
   return `
   <div class="head"><h2>Ajustes</h2></div>
+  <div class="panel"><h3>Sesión</h3><p style="margin-top:0">${fbUser?`${esc(fbUser.email)} · <b>${isEditor?'✏️ Editor':'👁 Solo lectura'}</b>`:'Sin sesión'}</p><button class="btn sec" onclick="doLogout()">Cerrar sesión</button></div>
   <div class="panel"><h3>Reglas</h3>${isEditor?'':'<div class="alert warn">🔒 Solo el editor puede modificar estos valores.</div>'}
     <div class="form" style="max-width:600px">
       <label class="f">Máximo de personas ausentes el mismo día<input type="number" min="1" value="${S.settings.maxOff}" ${isEditor?"":"disabled"} onchange="S.settings.maxOff=Math.max(1,+this.value);save();toast('Guardado')"></label>
