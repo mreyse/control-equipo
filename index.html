@@ -472,7 +472,7 @@ function vacations(){
     </div></div>
   ${needTeam()}
   <div class="panel">${list.length?`<table>
-    <tr><th>Integrante</th><th>Tipo</th><th>Fechas</th><th>Duración</th><th>Estado</th><th>Solicitada</th><th>Alertas</th><th></th></tr>
+    <tr><th>Integrante</th><th>Tipo</th><th>Fechas</th><th>Duración</th><th>Estado</th><th>Solicitada</th>${isEditor?'<th>Alertas</th>':''}<th></th></tr>
     ${list.map(v=>{ const c=['Aprobada','Pendiente'].includes(v.status)?vacConflicts(v):[]; return `<tr>
       <td><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))}</td>
       <td>${esc(v.type)}${v.notes?`<br><span class="muted" style="font-size:12px">${esc(v.notes)}</span>`:''}</td>
@@ -480,7 +480,7 @@ function vacations(){
       <td>${vacDur(v)}</td>
       <td><span class="pill ${v.status}">${v.status}</span></td>
       <td class="muted">${nice(v.requestedAt)}</td>
-      <td>${c.length?`<span title="${esc(c.map(x=>x.msg).join('\n'))}" style="cursor:help">${c.some(x=>x.lvl==='bad')?'⛔':'⚠️'} ${c.length}</span>`:'<span class="muted">—</span>'}</td>
+      ${isEditor?`<td>${c.length?`<span title="${esc(c.map(x=>x.msg).join('\n'))}" style="cursor:help">${c.some(x=>x.lvl==='bad')?'⛔':'⚠️'} ${c.length}</span>`:'<span class="muted">—</span>'}</td>`:''}
       <td style="white-space:nowrap;text-align:right">
         ${v.status==='Pendiente'?`<button class="btn ok sm" onclick="setStatus('${v.id}','Aprobada')">✓</button> <button class="btn bad sm" onclick="setStatus('${v.id}','Rechazada')">✕</button>`:''}
         <button class="btn sec sm" onclick="vacForm('${v.id}')">Editar</button></td></tr>`;}).join('')}
@@ -552,12 +552,12 @@ function oncall(){
   ${needTeam()}
   <div class="grid2" style="grid-template-columns:2fr 1fr">
   <div class="panel">${list.length?`<table>
-    <tr><th>Integrante</th><th>Equipo</th><th>Tipo</th><th>Periodo</th><th>Estado</th><th>Alertas</th><th></th></tr>
+    <tr><th>Integrante</th><th>Equipo</th><th>Tipo</th><th>Periodo</th><th>Estado</th>${isEditor?'<th>Alertas</th>':''}<th></th></tr>
     ${list.map(g=>{ const c=gdConflicts(g); const st = g.end<t?'Concluida':(g.start<=t?'En curso':'Programada'); return `<tr>
       <td><span class="dot" style="background:${mColor(g.memberId)}"></span>${esc(mName(g.memberId))}${g.notes?`<br><span class="muted" style="font-size:12px">${esc(g.notes)}</span>`:''}</td>
       <td>${esc(g.team||'')}</td><td>${esc(g.type)}</td><td>${nice(g.start)} – ${nice(g.end)}</td>
       <td>${st==='En curso'?'<b style="color:var(--ok)">● En curso</b>':`<span class="muted">${st}</span>`}</td>
-      <td>${c.length?`<span title="${esc(c.map(x=>x.msg).join('\n'))}" style="cursor:help">${c.some(x=>x.lvl==='bad')?'⛔':'⚠️'} ${c.length}</span>`:'<span class="muted">—</span>'}</td>
+      ${isEditor?`<td>${c.length?`<span title="${esc(c.map(x=>x.msg).join('\n'))}" style="cursor:help">${c.some(x=>x.lvl==='bad')?'⛔':'⚠️'} ${c.length}</span>`:'<span class="muted">—</span>'}</td>`:''}
       <td style="text-align:right"><button class="btn sec sm" onclick="gdForm('${g.id}')">Editar</button></td></tr>`;}).join('')}
   </table>`:'<div class="empty">Aún no hay guardias registradas.</div>'}</div>
   <div class="panel"><h3>Guardias por persona (${new Date().getFullYear()})</h3>
