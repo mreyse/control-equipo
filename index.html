@@ -787,7 +787,7 @@ function oncall(){
   <div class="head"><h2>Roles de guardia</h2>
     <div class="toolbar">
       <select onchange="ui.gdTeam=this.value;render()"><option value="">Todos los equipos</option>${['Colaboración','MM'].map(x=>`<option ${x===ui.gdTeam?'selected':''}>${x}</option>`).join('')}</select>
-      <select onchange="ui.gdMember=this.value;render()">${memberOptions(ui.gdMember,true)}</select>
+      <select onchange="ui.gdMember=this.value;render()"><option value="">Todos los de guardia</option>${['Colaboración','MM'].map(gr=>{ const ms=S.members.filter(m=>m.oncall!==false && (m.group||'Colaboración')===gr && (!ui.gdTeam||ui.gdTeam===gr)); return ms.length?`<optgroup label="${gr}">${ms.map(m=>`<option value="${m.id}" ${m.id===ui.gdMember?'selected':''}>${esc(m.name)}</option>`).join('')}</optgroup>`:''; }).join('')}</select>
       <button class="btn sec" onclick="exportCSV('oncall')">⬇ CSV</button>
       <button class="btn sec" onclick="rotationForm()">🔄 Generar rotación</button>
       <button class="btn" onclick="gdForm()">+ Guardia</button>
@@ -807,7 +807,7 @@ function gdForm(id, pre){
   const g = id ? S.oncall.find(x=>x.id===id) : Object.assign({ memberId:(S.members.find(m=>m.oncall!==false)||S.members[0]).id, team:'Colaboración', type:'Primaria', start:todayS(), end:fd(new Date(Date.now()+6*864e5)), notes:'' }, pre||{});
   openModal(`<h3>${id?'Editar':'Nueva'} guardia</h3>
     <div class="form">
-      <label class="f">Integrante<select id="gMember" onchange="gdPreview('${id||''}')">${memberOptions(g.memberId)}</select></label>
+      <label class="f">Integrante<select id="gMember" onchange="gdPreview('${id||''}')">${S.members.filter(m=>m.oncall!==false||m.id===g.memberId).map(m=>`<option value="${m.id}" ${m.id===g.memberId?'selected':''}>${esc(m.name)}</option>`).join('')}</select></label>
       <label class="f">Equipo de guardia<select id="gTeam" onchange="gdPreview('${id||''}')">${['Colaboración','MM'].map(t=>`<option ${t===g.team?'selected':''}>${t}</option>`).join('')}</select></label>
       <label class="f">Tipo<select id="gType" onchange="gdPreview('${id||''}')">${GD_TYPES.map(t=>`<option ${t===g.type?'selected':''}>${t}</option>`).join('')}</select></label>
       <label class="f">Desde<input type="date" id="gStart" value="${g.start}" onchange="gdPreview('${id||''}')"></label>
