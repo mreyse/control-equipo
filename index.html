@@ -614,7 +614,7 @@ function defaultPositions(n){
   const base = [
     {name:'Mañana',  days:['Mañana','Mañana','Mañana','Mañana','Mañana',D,D]},
     {name:'Mutante', days:[D,'Mutante','Mutante','Mutante','Mutante',O,D]},
-    {name:'Tarde',   days:[O,D,'Tarde','Tarde','Tarde',D,D]},
+    {name:'Tarde',   days:[O,O,'Tarde','Tarde','Tarde',D,D]},
     {name:'Oficina 1', days:['Tarde','Tarde',O,O,O,D,D]},
   ];
   for(let i=2; base.length<n; i++) base.push({name:'Oficina '+i, days:[O,O,O,O,O,D,D]});
@@ -915,7 +915,10 @@ function resetPass(){
     dbRef.on('value', snap=>{
       const v = snap.val();
       if(v){ lastRemote = v; applyingRemote=true; S = hydrate(v); rotCache=new Map(); try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} render(); applyingRemote=false; setSync('✓ Sincronizado');
-        if(isEditor && !S.mig4){ S.rotation.hours = NEW_HOURS(); S.mig4 = true; save(); render(); } }
+        let ch=false;
+        if(isEditor && !S.mig4){ S.rotation.hours = NEW_HOURS(); S.mig4 = true; ch=true; }
+        if(isEditor && !S.mig5){ const t=S.rotation.positions.find(p=>p.name==='Tarde'); if(t && t.days[1]==='Descanso') t.days[1]='Oficina'; S.mig5 = true; ch=true; }
+        if(ch){ save(); render(); } }
       else if(isEditor){ save(); toast('Datos subidos a la nube por primera vez'); }
       else { setSync('Sin datos todavía'); }
     }, err=>{ setSync('⚠ Sin permiso'); toast('No tienes permiso para ver los datos ('+err.code+').'); });
