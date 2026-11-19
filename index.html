@@ -761,8 +761,7 @@ function oncall(){
     </div></div>
   ${needTeam()}
   <div class="${isEditor?'grid2 gdgrid':''}">
-  <div class="panel"><h3>🚨 Rotación completa · ${N} semanas</h3>
-    <p class="muted" style="margin-top:-6px">Del ${nice(fd(mon))} al ${nice(fd(last))}. Una vuelta completa de los ${N} integrantes de guardia de Colaboración; MM rota en las mismas semanas.${isEditor?' Clic en una guardia para editarla, o en «Sin asignar» para asignarla.':''}</p>
+  <div class="panel">
     ${guardTimeline(t, {weeks:N, teams, member:ui.gdMember, clickable:true, notes:true, bare:true})}
   </div>
   ${isEditor?`<div class="panel"><h3>Guardias por persona (${yr})</h3>
