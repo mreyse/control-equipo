@@ -707,9 +707,9 @@ function dashboard(){
     <button class="btn sec" onclick="gdForm()">+ Guardia</button></div></div>
   ${needTeam()}
   <div class="grid4">
-    <div class="kpi"><div class="n">${S.members.length}</div><div class="l">Integrantes</div></div>
     <div class="kpi"><div class="l" style="margin-bottom:6px">🚨 De guardia hoy</div>${['Colaboración','MM'].map(team=>{ const g=gdToday.find(x=>(x.team||'Colaboración')===team); return `<div class="gtoday"><div><span class="dot" style="background:${g?mColor(g.memberId):'#ccc'}"></span><b>${g?esc(mName(g.memberId)):'<span class="muted">Sin asignar</span>'}</b> <span class="muted" style="font-size:12px">${team}</span></div>${phoneLink(team)}</div>`; }).join('')}</div>
     <div class="kpi"><div class="n">${offToday.length}</div><div class="l">Ausentes hoy</div>${offToday.length?`<div style="margin-top:6px;font-size:13px">${offToday.map(v=>`<div><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))} <span class="muted" style="font-size:11px">(${esc(v.type)}${v.end>t?` · hasta ${nice(v.end)}`:''})</span></div>`).join('')}</div>`:''}</div>
+    <div class="kpi"><div class="n">${S.members.length}</div><div class="l">Integrantes</div></div>
     <div class="kpi"><div class="n" style="color:var(--warn)">${pend.length + (isEditor ? reqList().filter(reqNeedsAdmin).length : reqList().filter(r=>(reqMine(r)&&['Pendiente','Esperando compañero','Por aprobar'].includes(r.status))||reqIncoming(r)).length)}</div><div class="l">${isEditor?'Solicitudes pendientes':'Mis solicitudes en trámite'}</div></div>
   </div>
   ${(()=>{ const h=holidayOn(t); const nx=[...holidaysOfYear(+t.slice(0,4)),...holidaysOfYear(+t.slice(0,4)+1)].find(x=>x.date>t);
