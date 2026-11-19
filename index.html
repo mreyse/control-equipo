@@ -175,6 +175,12 @@ body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
 .wdh{font-size:13px;margin-bottom:6px;color:var(--muted)}.wdh b{color:var(--ink);font-size:15px}
 .agenda .wd{border:1px solid var(--line);border-radius:10px;min-height:0;margin-bottom:8px}
 .lnk{cursor:pointer}.lnk:hover{color:var(--accent);text-decoration:underline}
+.covl{margin-bottom:12px}
+.covl .covt{font-size:12px;padding:3px 8px;border:1px solid #e3e7ee}
+.covn{display:inline-block;background:rgba(0,0,0,.08);border-radius:8px;padding:0 6px;margin-left:4px;font-size:11px}
+.covl ul{list-style:none;margin:6px 0 0;padding:0 0 0 4px}
+.covl li{padding:3px 0;font-size:14px;border-bottom:1px solid #f1f3f7}
+.covl li:last-child{border-bottom:0}
 .covbox{margin-bottom:6px;display:flex;flex-direction:column;gap:3px}
 .cov{font-size:12px;line-height:1.35}
 .covt{display:inline-block;border-radius:4px;padding:1px 6px;font-weight:600;font-size:11px;margin-right:2px}
@@ -467,6 +473,8 @@ function coverageHTML(s, full){
   const roles = full ? ['Mañana','Mutante','Tarde','Oficina','Home office','Horario fijo'] : COVER;
   const rows = roles.filter(r=>W[r] && W[r].length || (COVER.includes(r) && !holidayOn(s) && dow(pd(s))<5 && !ui.calMember))
     .map(r=>{ const list=W[r]||[]; const h=S.rotation.hours[r];
+      if(full) return `<div class="covl"><div class="covt" style="background:${SHIFT_COLORS[r]||'#eef1f6'}">${r}${h?` <span style="font-weight:400;opacity:.75">${h.start}–${h.end}</span>`:''} <span class="covn">${list.length}</span></div>
+        <ul>${list.length?list.map(m=>`<li><span class="dot" style="background:${m.color}"></span>${esc(m.name)}${r==='Horario fijo'&&m.fixed?` <span class="muted" style="font-size:12px">${m.fixed.start}–${m.fixed.end}</span>`:''}</li>`).join(''):'<li style="color:var(--bad)">Sin cubrir</li>'}</ul></div>`;
       return `<div class="cov"><span class="covt" style="background:${SHIFT_COLORS[r]||'#eef1f6'}">${r}${full&&h?` <span class="muted" style="font-weight:400">${h.start}–${h.end}</span>`:''}</span> ${list.length?list.map(m=>esc(full?m.name:m.name.split(' ')[0])).join(', '):'<span style="color:var(--bad)">sin cubrir</span>'}</div>`; }).join('');
   return rows ? `<div class="covbox">${rows}</div>` : '';
 }
