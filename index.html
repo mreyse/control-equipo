@@ -159,6 +159,11 @@ body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
 .agenda .ad.today{border:2px solid var(--accent)}
 .agenda .ad h4{margin:0 0 6px;font-size:13px;display:flex;justify-content:space-between}
 .agenda .chip{font-size:12px;padding:4px 7px;white-space:normal}
+.fixdays{display:flex;flex-wrap:nowrap;gap:4px;margin-top:8px;overflow-x:auto}
+.fixdays label{display:flex;align-items:center;gap:4px;white-space:nowrap;font-size:13px;border:1px solid var(--line);border-radius:7px;padding:5px 9px;cursor:pointer}
+.fixdays input{margin:0}
+.gweek td,.gweek th{white-space:nowrap}
+.gweek tr.now td{background:var(--accent-soft)}
 @media print{aside,.toolbar,button{display:none!important}main{padding:0}}
 </style>
 </head>
@@ -430,6 +435,7 @@ function calendar(){
       <button class="btn sec hide-m" onclick="window.print()">🖨 Imprimir</button>
     </div></div>
   ${mobile ? `<div class="agenda">${agenda || '<div class="panel empty">Sin eventos este mes</div>'}</div>` : `<div class="cal">${DAYS.map(d=>`<div class="dh">${d}</div>`).join('')}${cells}</div>`}
+  ${guardWeeks(start, totalCells/7)}
   <div class="legend">
     <span><i class="sw" style="background:#fff;border-left:4px solid var(--accent);border:1px solid #ccc;border-left-width:4px"></i>🚨 Guardia</span>
     <span><i class="sw" style="background:var(--accent)"></i>🌴 Ausencia aprobada</span>
@@ -437,6 +443,18 @@ function calendar(){
     <span>⏱ Horas extras a cambiar</span>
     <span style="color:var(--bad)">“N aus.” = más ausentes que el máximo permitido (${S.settings.maxOff})</span>
   </div>`;
+}
+function guardWeeks(start, weeks){
+  const teams = ['Colaboración','MM'], t = todayS();
+  let rows = '';
+  for(let w=0; w<weeks; w++){
+    const a=new Date(start); a.setDate(a.getDate()+w*7); const e=new Date(a); e.setDate(e.getDate()+6);
+    const as=fd(a), es=fd(e);
+    const cell = team => { const gs = S.oncall.filter(g=>(g.team||'Colaboración')===team && overlaps(g.start,g.end,as,es) && groupFilter(ui.calMember,g.memberId)).sort((x,y)=>x.start.localeCompare(y.start));
+      return gs.length ? gs.map(g=>`<span class="dot" style="background:${mColor(g.memberId)}"></span>${esc(mName(g.memberId))}${(g.start>as||g.end<es)?` <span class="muted" style="font-size:11px">(${nice(g.start).slice(0,6)}–${nice(g.end).slice(0,6)})</span>`:''}`).join('<br>') : '<span class="muted">—</span>'; };
+    rows += `<tr class="${inRange(t,as,es)?'now':''}"><td><b>${a.getDate()} ${MONTHS[a.getMonth()].slice(0,3)} – ${e.getDate()} ${MONTHS[e.getMonth()].slice(0,3)}</b></td>${teams.map(tm=>`<td>${cell(tm)}</td>`).join('')}</tr>`;
+  }
+  return `<div class="panel" style="margin-top:14px"><h3>🚨 Guardias por semana</h3><table class="gweek"><tr><th>Semana</th>${teams.map(tm=>`<th>${tm}</th>`).join('')}</tr>${rows}</table></div>`;
 }
 function calNav(n){ if(n===0){ const d=new Date(); ui.calY=d.getFullYear(); ui.calM=d.getMonth(); } else { ui.calM+=n; if(ui.calM<0){ui.calM=11;ui.calY--;} if(ui.calM>11){ui.calM=0;ui.calY++;} } render(); }
 
@@ -806,9 +824,11 @@ function memberForm(id){
       <label class="full" style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="mOncall" ${m.oncall!==false?'checked':''}> Participa en rotación de guardias</label>
       <label class="full" style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="mShifts" ${m.shifts!==false?'checked':''}> Participa en la rotación semanal de horarios (Mañana/Mutante/Tarde/Oficina)</label>
       <div class="full"><label class="f">Horario fijo (si no está en la rotación)</label>
-        <label style="font-size:13px"><input type="checkbox" id="mFixOn" ${m.fixed?'checked':''}> Tiene horario fijo</label>
-        <input type="time" id="mFixS" value="${m.fixed?.start||'08:30'}"> – <input type="time" id="mFixE" value="${m.fixed?.end||'18:30'}">
-        ${DAYS.map((d,i)=>`<label style="font-size:12px;margin-left:6px"><input type="checkbox" class="mFixD" value="${i}" ${(m.fixed?m.fixed.days:[0,1,2,3,4]).includes(i)?'checked':''}>${d}</label>`).join('')}</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">
+          <label style="font-size:13px;white-space:nowrap"><input type="checkbox" id="mFixOn" ${m.fixed?'checked':''}> Tiene horario fijo</label>
+          <span style="white-space:nowrap"><input type="time" id="mFixS" value="${m.fixed?.start||'08:30'}"> – <input type="time" id="mFixE" value="${m.fixed?.end||'18:30'}"></span>
+        </div>
+        <div class="fixdays">${DAYS.map((d,i)=>`<label><input type="checkbox" class="mFixD" value="${i}" ${(m.fixed?m.fixed.days:[0,1,2,3,4]).includes(i)?'checked':''}>${d}</label>`).join('')}</div></div>
     </div>
     <div class="actions">${id?`<button class="btn bad" style="margin-right:auto" onclick="delMember('${id}')">Eliminar</button>`:''}
       <button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="saveMember('${id||''}')">Guardar</button></div>`);
