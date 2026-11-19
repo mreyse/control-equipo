@@ -396,7 +396,7 @@ function dashboard(){
   <div class="grid4">
     <div class="kpi"><div class="n">${S.members.length}</div><div class="l">Integrantes</div></div>
     <div class="kpi"><div class="n" style="color:var(--warn)">${pend.length}</div><div class="l">Solicitudes pendientes</div></div>
-    <div class="kpi"><div class="n">${offToday.length}</div><div class="l">Ausentes hoy</div></div>
+    <div class="kpi"><div class="n">${offToday.length}</div><div class="l">Ausentes hoy</div>${offToday.length?`<div style="margin-top:6px;font-size:13px">${offToday.map(v=>`<div><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))} <span class="muted" style="font-size:11px">(${esc(v.type)}${v.end>t?` · hasta ${nice(v.end)}`:''})</span></div>`).join('')}</div>`:''}</div>
     <div class="kpi"><div class="n" style="font-size:16px;padding-top:6px">${gdToday.length?gdToday.map(g=>`<span class="dot" style="background:${mColor(g.memberId)}"></span>${esc(mName(g.memberId))} <span class="muted" style="font-size:12px">(${esc(g.team||g.type)})</span>`).join('<br>'):'<span class="muted">Sin asignar</span>'}</div><div class="l">De guardia hoy</div></div>
   </div>
   ${isEditor && conflicts.length?`<div class="panel"><h3>⚠️ Conflictos detectados (${conflicts.length})</h3>${conflicts.map(c=>`<div class="alert ${c.lvl}"><b>${esc(c.who)}</b> · ${esc(c.what)}<br>${esc(c.msg)}</div>`).join('')}</div>`:''}
