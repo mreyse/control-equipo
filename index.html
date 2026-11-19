@@ -222,10 +222,12 @@ const GD_TYPES = ['Primaria','Secundaria','Respaldo'];
 let S;
 let ui = { view:'dashboard', calY:new Date().getFullYear(), calM:new Date().getMonth(), calMember:'', calGuards:true, vacFilter:'Todas', vacMember:'', gdMember:'' };
 
+const NEW_HOURS = () => ({ 'Mañana':{start:'08:00',end:'18:00'}, 'Mutante':{start:'10:00',end:'20:00'}, 'Tarde':{start:'14:00',end:'22:30'}, 'Oficina':{start:'09:00',end:'19:00'}, 'Home office':{start:'09:00',end:'19:00'} });
+const MEAL_H = 1.5; // 1:30 h de comida por jornada
 function blank(){
   return { members:[], oncall:[], vacations:[], settings:{ maxOff:2, defaultDays:18 },
     rotation:{ anchor:'2026-11-09', order:[], positions:[], overrides:{}, breaks:[],
-      hours:{ 'Mañana':{start:'07:00',end:'16:00'}, 'Mutante':{start:'10:00',end:'19:00'}, 'Tarde':{start:'13:00',end:'22:00'}, 'Oficina':{start:'09:00',end:'18:00'}, 'Home office':{start:'09:00',end:'18:00'} } } };
+      hours:{ 'Mañana':{start:'08:00',end:'18:00'}, 'Mutante':{start:'10:00',end:'20:00'}, 'Tarde':{start:'14:00',end:'22:30'}, 'Oficina':{start:'09:00',end:'19:00'}, 'Home office':{start:'09:00',end:'19:00'} } } };
 }
 function seedTeam(st){ return st; } // Los datos del equipo viven en Firebase, no en el código
 const toArr = v => Array.isArray(v) ? v.filter(x=>x!=null) : (v ? Object.values(v) : []);
@@ -648,7 +650,8 @@ function positionOf(mid, s){ return lineup(weekIdx(s)).indexOf(mid); }
 function memberAtPos(p, s){ return lineup(weekIdx(s))[p]; }
 function roleShift(mid, s){ const p=positionOf(mid,s); if(p<0) return 'Descanso'; return S.rotation.positions[p].days[dow(pd(s))] || 'Descanso'; }
 function shiftOf(mid, s){ const o=S.rotation.overrides[mid+'|'+s]; return o ? o.shift : roleShift(mid,s); }
-function shiftHours(sh){ const h=S.rotation.hours[sh]; return h ? hoursBetween(h.start,h.end) : 0; }
+function workHours(a,b){ return Math.max(0, hoursBetween(a,b) - MEAL_H); }
+function shiftHours(sh){ const h=S.rotation.hours[sh]; return h ? workHours(h.start,h.end) : 0; }
 
 function schedules(){
   syncRotation();
@@ -690,6 +693,7 @@ function schedules(){
   </div>
   ${fixedTable(week)}
   <div class="legend">${SHIFTS.map(s=>`<span><i class="sw" style="background:${SHIFT_COLORS[s]};border:1px solid #ccc"></i>${s}${R.hours[s]?` <span class="muted">(${R.hours[s].start}–${R.hours[s].end})</span>`:''}</span>`).join('')}<span>✎ = cambio manual</span></div>
+  <div class="alert ok" style="margin-top:10px">🍽 Todos los turnos incluyen <b>1:30 h de comida</b>. La columna «Hrs» muestra las horas efectivas por semana (sin la comida).</div>
   <p class="muted" style="font-size:12px">Cada semana todos bajan una posición (el último pasa a Mañana). Haz clic en una celda para cambiar ese día (intercambio, home office, descanso…). Las vacaciones aprobadas y guardias se muestran encima.</p>`:''}`;
 }
 function fixedTable(week){
@@ -705,7 +709,7 @@ function fixedTable(week){
       let txt='',bg='#eceef2';
       if(vac){ txt='🌴 '+vac.type; bg='#d9ead3'; }
       else if(ov){ txt=ov.shift==='Descanso'?'':ov.shift; bg=SHIFT_COLORS[ov.shift]||'#fff'; hrs+=shiftHours(ov.shift); }
-      else if(m.fixed.days.includes(i)){ txt=`${m.fixed.start}–${m.fixed.end}`; bg='#fff'; hrs+=hoursBetween(m.fixed.start,m.fixed.end); }
+      else if(m.fixed.days.includes(i)){ txt=`${m.fixed.start}–${m.fixed.end}`; bg='#fff'; hrs+=workHours(m.fixed.start,m.fixed.end); }
       return `<td class="sc" style="background:${bg}" onclick="cellEdit('${m.id}','${s}')">${esc(txt)}${ov?'<sup style="color:var(--accent)">✎</sup>':''}${gd?'<div style="font-size:10px">🚨 Guardia</div>':''}</td>`; }).join('')}<td><b>${hrs.toFixed(1).replace('.0','')}</b></td></tr>`; }).join('')}
   </table></div>`).join('');
 }
@@ -756,7 +760,7 @@ function rotForm(keep){
         <td><button class="btn bad sm" onclick="ui.rot.breaks.splice(${i},1);rotForm(true)">✕</button></td></tr>`).join('')}
     </table>
     <button class="btn sec sm" style="margin-top:8px" onclick="ui.rot.breaks.push({id:uid(),memberId:ui.rot.order[0],start:todayS(),end:todayS(),returnPos:ui.rot.positions.length-1,reason:''});rotForm(true)">+ Agregar pausa</button>
-    <h3 style="margin-top:16px">Horario de cada turno</h3>
+    <h3 style="margin-top:16px">Horario de cada turno</h3><p class="muted" style="font-size:12px;margin-top:0">Cada turno incluye 1:30 h de comida.</p>
     <div style="display:flex;gap:14px;flex-wrap:wrap">${['Mañana','Mutante','Tarde','Oficina','Home office'].map(s=>`<label class="f">${s}<span><input type="time" value="${D.hours[s]?.start||'09:00'}" onchange="ui.rot.hours['${s}'].start=this.value"> – <input type="time" value="${D.hours[s]?.end||'18:00'}" onchange="ui.rot.hours['${s}'].end=this.value"></span></label>`).join('')}</div>
     <div class="actions"><button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="saveRot()">Guardar</button></div>`);
   document.getElementById('modal').style.width='min(1000px,96vw)';
@@ -910,7 +914,8 @@ function resetPass(){
     dbRef = firebase.database().ref(DB_PATH);
     dbRef.on('value', snap=>{
       const v = snap.val();
-      if(v){ lastRemote = v; applyingRemote=true; S = hydrate(v); rotCache=new Map(); try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} render(); applyingRemote=false; setSync('✓ Sincronizado'); }
+      if(v){ lastRemote = v; applyingRemote=true; S = hydrate(v); rotCache=new Map(); try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} render(); applyingRemote=false; setSync('✓ Sincronizado');
+        if(isEditor && !S.mig4){ S.rotation.hours = NEW_HOURS(); S.mig4 = true; save(); render(); } }
       else if(isEditor){ save(); toast('Datos subidos a la nube por primera vez'); }
       else { setSync('Sin datos todavía'); }
     }, err=>{ setSync('⚠ Sin permiso'); toast('No tienes permiso para ver los datos ('+err.code+').'); });
