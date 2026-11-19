@@ -195,6 +195,14 @@ body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
 .gclick:hover{background:#f1f5ff}
 .gfade{opacity:.35}
 .gweekrow.gdim{opacity:.45}
+.mng{border:1px solid var(--accent);background:linear-gradient(180deg,var(--accent-soft),#fff);border-radius:12px;padding:14px;margin-bottom:14px}
+.mngh{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.mngl{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.mngc{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;position:relative}
+.mngc.now{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.mngc.est{border-style:dashed}
+.mngb{display:inline-block;margin-top:5px;font-size:10px;background:#eef1f6;color:var(--muted);border-radius:6px;padding:1px 6px}
+@media(max-width:900px){.mngl{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .gslot{display:flex;align-items:center;gap:9px;min-width:0}
 .gav{width:34px;height:34px;border-radius:50%;color:#fff;font-weight:700;font-size:12px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.15)}
 .gname{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -474,6 +482,31 @@ function guardTimeline(t, o){
       ${slots}</div>`;
   }
   return o.bare ? `<div class="gtl">${rows}</div>` : `<div class="panel"><h3>🚨 Próximas guardias</h3><div class="gtl">${rows}</div></div>`;
+}
+function memberNextGuards(mid, t){
+  const m = member(mid); if(!m) return '';
+  const mine = S.oncall.filter(g=>g.memberId===mid && g.end>=t).sort((a,b)=>a.start.localeCompare(b.start)).map(g=>({start:g.start,end:g.end,team:g.team||'Colaboración',id:g.id,est:false}));
+  const team = mine[0]?.team || (m.group==='MM'?'MM':'Colaboración');
+  const cycle = team==='MM' ? Math.max(1,S.members.filter(x=>x.oncall!==false && x.group==='MM').length) : collabRotationWeeks();
+  // si no hay suficientes registradas, estimar con la rotación (cada N semanas desde la última)
+  let last = mine.length ? mine[mine.length-1] : S.oncall.filter(g=>g.memberId===mid).sort((a,b)=>b.start.localeCompare(a.start))[0];
+  if(last) last = {start:last.start, end:last.end};
+  while(mine.length<5 && last){
+    const a=pd(last.start); a.setDate(a.getDate()+cycle*7); const e=new Date(a); e.setDate(e.getDate()+6);
+    last={start:fd(a), end:fd(e)};
+    if(last.end>=t) mine.push({...last, team, est:true});
+  }
+  if(!mine.length) return `<div class="mng"><div class="mngh"><span class="gav" style="background:${m.color}">${esc(m.name.split(' ').map(w=>w[0]).slice(0,2).join(''))}</span><b>${esc(m.name)}</b></div><span class="muted">No tiene guardias asignadas.</span></div>`;
+  const wk = d => Math.round((pd(mondayOf(d)) - pd(mondayOf(t)))/(7*864e5));
+  const card = g => { const a=pd(g.start), e=pd(g.end), w=wk(g.start), now=g.start<=t&&g.end>=t;
+    return `<div class="mngc ${now?'now':''} ${g.est?'est':''}" ${!g.est&&isEditor?`onclick="gdForm('${g.id}')" style="cursor:pointer"`:''}>
+      <div class="grel">${now?'<span class="gpulse"></span>En curso':w===1?'Próxima semana':`En ${w} semanas`}</div>
+      <div class="grange">${a.getDate()} ${MONTHS[a.getMonth()].slice(0,3)} – ${e.getDate()} ${MONTHS[e.getMonth()].slice(0,3)}</div>
+      <div class="gteam">${a.getFullYear()} · ${esc(g.team)}</div>
+      ${g.est?'<span class="mngb">Estimada</span>':''}</div>`; };
+  return `<div class="mng"><div class="mngh"><span class="gav" style="background:${m.color}">${esc(m.name.split(' ').filter(w=>/^[A-ZÁÉÍÓÚÑ]/.test(w)).slice(0,2).map(w=>w[0]).join(''))}</span><div><b>Próximas guardias de ${esc(m.name)}</b><div class="gteam">${esc(team)} · rota cada ${cycle} semanas</div></div></div>
+    <div class="mngl">${mine.slice(0,5).map(card).join('')}</div>
+    ${mine.slice(0,5).some(g=>g.est)?'<div class="muted" style="font-size:11px;margin-top:6px">«Estimada»: calculada con la rotación, todavía no está registrada.</div>':''}</div>`;
 }
 function collabRotationWeeks(){ return Math.max(1, S.members.filter(m=>m.oncall!==false && m.group==='Colaboración').length); }
 function dashboard(){
@@ -762,6 +795,7 @@ function oncall(){
   ${needTeam()}
   <div class="${isEditor?'grid2 gdgrid':''}">
   <div class="panel">
+    ${ui.gdMember ? memberNextGuards(ui.gdMember, t) : ''}
     ${guardTimeline(t, {weeks:N, teams, member:ui.gdMember, clickable:true, notes:true, bare:true})}
   </div>
   ${isEditor?`<div class="panel"><h3>Guardias por persona (${yr})</h3>
