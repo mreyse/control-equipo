@@ -179,6 +179,7 @@ body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
 .agenda .wd{border:1px solid var(--line);border-radius:10px;min-height:0;margin-bottom:8px}
 .lnk{cursor:pointer}.lnk:hover{color:var(--accent);text-decoration:underline}
 .covl{margin-bottom:12px}
+.covgrid .covbox{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:4px 18px}
 .covl .covt{font-size:12px;padding:3px 8px;border:1px solid #e3e7ee}
 .covn{display:inline-block;background:rgba(0,0,0,.08);border-radius:8px;padding:0 6px;margin-left:4px;font-size:11px}
 .covl ul{list-style:none;margin:6px 0 0;padding:0 0 0 4px}
@@ -423,7 +424,7 @@ function dashboard(){
   </div>
   ${(()=>{ const h=holidayOn(t); const nx=[...holidaysOfYear(+t.slice(0,4)),...holidaysOfYear(+t.slice(0,4)+1)].find(x=>x.date>t);
      return h ? `<div class="alert bad" style="font-size:14px">🎉 <b>Hoy es día festivo:</b> ${esc(h.name)}</div>` : (nx?`<div class="alert ok">🎉 Próximo día festivo: <b>${esc(nx.name)}</b> · ${DAYS[dow(pd(nx.date))]} ${nice(nx.date)}</div>`:''); })()}
-  <div class="panel"><h3>Turnos de hoy</h3><div class="toolbar">${COVER.map(r=>{ const who=S.members.filter(m=>shiftOf(m.id,t)===r && !offOn(t).some(v=>v.memberId===m.id)); return `<span class="shift" style="background:${SHIFT_COLORS[r]};color:var(--ink);padding:6px 10px"><b>${r}:</b> ${who.length?who.map(m=>esc(m.name)).join(', '):'<span style="color:var(--bad)">sin cubrir / no aplica</span>'}</span>`; }).join('')}</div></div>
+  <div class="panel"><h3>Turnos de hoy</h3>${(()=>{ const keep=ui.calMember; ui.calMember=''; const h=coverageHTML(t,true); ui.calMember=keep; return h?`<div class="covgrid">${h}</div>`:'<span class="muted">Nadie programado hoy</span>'; })()}</div>
   <div class="grid2">
     <div class="panel"><h3>Pendientes de aprobar</h3>
       ${pend.length? `<table>${pend.map(v=>`<tr><td><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))}<br><span class="muted">${esc(v.type)} · ${vacWhen(v)} · ${vacDur(v)}</span></td>
