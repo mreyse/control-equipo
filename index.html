@@ -73,6 +73,9 @@ label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mu
 .cal .num{font-weight:600;margin-bottom:4px;display:flex;justify-content:space-between}
 .cal .num .off{color:var(--bad);font-weight:600}
 .chip{display:block;border-radius:4px;padding:2px 5px;margin-bottom:2px;color:#fff;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip.vac{background:#fff!important;color:var(--ink);border-left:4px solid;border-top:1px solid #eef0f4;border-right:1px solid #eef0f4;border-bottom:1px solid #eef0f4}
+.chip.vac.vpend{border-left-style:dashed;color:var(--muted)}
+.chip.cv{background:#fff!important;color:var(--ink);border-left:4px solid;border-top:1px solid #eef0f4;border-right:1px solid #eef0f4;border-bottom:1px solid #eef0f4}
 .chip.pend{background:#fff!important;border:1.5px dashed;color:var(--ink)}
 .cal .d.hol{background:#fff5f5}
 .chip.holc{background:#fde2e2!important;color:#b42318;font-weight:600;border:0}
@@ -462,16 +465,24 @@ function whoOn(s){ // turnos del día (sin ausentes)
   return out;
 }
 const DAYNAMES = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+function expectedShift(r, s){ return S.rotation.positions.some(p=>p.days[dow(pd(s))]===r); }
+const COVER_LINE = { 'Mañana':'#e8996b', 'Mutante':'#4caf50', 'Tarde':'#e0a800' };
+function coverChips(s){
+  if(holidayOn(s)) return '';
+  const W = whoOn(s);
+  return COVER.map(r=>{ const list=W[r]||[]; if(!list.length && (!expectedShift(r,s) || ui.calMember)) return '';
+    return `<span class="chip cv" style="border-left-color:${COVER_LINE[r]}" title="${r}"><b>${r}:</b> ${list.length?list.map(m=>esc(m.name.split(' ')[0])).join(', '):'<span style="color:var(--bad)">sin cubrir</span>'}</span>`; }).join('');
+}
 function chipsFull(s, D, compact){
   return `${D.hol?`<span class="chip holc">🎉 ${esc(D.hol.name)}</span>`:''}
     ${D.gds.map(g=>`<span class="chip gd" style="border-color:${mColor(g.memberId)}" title="Guardia ${esc(g.team||'')}">🚨 ${compact?'':'Guardia '+esc(g.team||'')+': '}${esc(mName(g.memberId))}</span>`).join('')}
-    ${D.vacs.map(v=>`<span class="chip ${v.status==='Pendiente'?'pend':''}" style="background:${mColor(v.memberId)};border-color:${mColor(v.memberId)}" title="${esc(v.type)} (${v.status})" onclick="vacForm('${v.id}')">${v.status==='Pendiente'?'⏳ ':'🌴 '}${esc(mName(v.memberId))}${compact?'':' · '+esc(v.type)+(v.status==='Pendiente'?' (pendiente)':'')}</span>`).join('')}
+    ${D.vacs.map(v=>`<span class="chip vac ${v.status==='Pendiente'?'vpend':''}" style="border-left-color:${mColor(v.memberId)}" title="${esc(v.type)} (${v.status})" onclick="vacForm('${v.id}')">${v.status==='Pendiente'?'⏳ ':'🌴 '}${esc(mName(v.memberId))}${compact?'':' · '+esc(v.type)+(v.status==='Pendiente'?' (pendiente)':'')}</span>`).join('')}
     ${D.hxs.map(v=>`<span class="chip hx ${v.status==='Pendiente'?'pend':''}" style="border-color:${mColor(v.memberId)}" title="${HX} (${v.status})" onclick="vacForm('${v.id}')">⏱ ${esc(mName(v.memberId))} ${v.tStart||''}–${v.tEnd||''}</span>`).join('')}`;
 }
 function coverageHTML(s, full){
   const W = whoOn(s);
   const roles = full ? ['Mañana','Mutante','Tarde','Oficina','Home office','Horario fijo'] : COVER;
-  const rows = roles.filter(r=>W[r] && W[r].length || (COVER.includes(r) && !holidayOn(s) && dow(pd(s))<5 && !ui.calMember))
+  const rows = roles.filter(r=>W[r] && W[r].length || (COVER.includes(r) && !holidayOn(s) && expectedShift(r,s) && !ui.calMember))
     .map(r=>{ const list=W[r]||[]; const h=S.rotation.hours[r];
       if(full) return `<div class="covl"><div class="covt" style="background:${SHIFT_COLORS[r]||'#eef1f6'}">${r}${h?` <span style="font-weight:400;opacity:.75">${h.start}–${h.end}</span>`:''} <span class="covn">${list.length}</span></div>
         <ul>${list.length?list.map(m=>`<li><span class="dot" style="background:${m.color}"></span>${esc(m.name)}${r==='Horario fijo'&&m.fixed?` <span class="muted" style="font-size:12px">${m.fixed.start}–${m.fixed.end}</span>`:''}</li>`).join(''):'<li style="color:var(--bad)">Sin cubrir</li>'}</ul></div>`;
@@ -492,7 +503,7 @@ function calendar(){
       if(mobile && d.getMonth()===m && (D.gds.length||D.vacs.length||D.hxs.length||s===t||D.hol))
         agenda += `<div class="ad ${s===t?'today':''}"><h4><span class="lnk" onclick="calGo('day','${s}')">${DAYNAMES[d.getDay()]} ${d.getDate()}${s===t?' · Hoy':''}</span>${D.offCount>S.settings.maxOff?`<span style="color:var(--bad)">${D.offCount} ausentes</span>`:''}</h4>${chipsFull(s,D,false)}</div>`;
       cells += `<div class="d ${d.getMonth()!==m?'out':''} ${s===t?'today':''} ${dow(d)>4?'we':''} ${D.hol?'hol':''}">
-        <div class="num"><span class="lnk" onclick="calGo('day','${s}')">${d.getDate()}</span>${D.offCount>S.settings.maxOff?`<span class="off" title="Ausencias por encima del máximo">${D.offCount} aus.</span>`:''}</div>${chipsFull(s,D,true)}</div>`;
+        <div class="num"><span class="lnk" onclick="calGo('day','${s}')">${d.getDate()}</span>${D.offCount>S.settings.maxOff?`<span class="off" title="Ausencias por encima del máximo">${D.offCount} aus.</span>`:''}</div>${coverChips(s)}${chipsFull(s,D,true)}</div>`;
     }
     title = `${MONTHS[m]} ${y}`;
     body = mobile ? `<div class="agenda">${agenda || '<div class="panel empty">Sin eventos este mes</div>'}</div>` : `<div class="cal">${DAYS.map(d=>`<div class="dh">${d}</div>`).join('')}${cells}</div>`;
@@ -542,8 +553,8 @@ function calendar(){
   ${guardWeeks(gStart, gWeeks)}
   <div class="legend">
     <span><i class="sw" style="background:#fff;border-left:4px solid var(--accent);border:1px solid #ccc;border-left-width:4px"></i>🚨 Guardia</span>
-    <span><i class="sw" style="background:var(--accent)"></i>🌴 Ausencia aprobada</span>
-    <span><i class="sw" style="border:1.5px dashed var(--accent)"></i>⏳ Solicitud pendiente</span>
+    <span><i class="sw" style="background:#fff;border:1px solid #ddd;border-left:4px solid var(--accent)"></i>🌴 Ausencia aprobada (línea = color de la persona)</span>
+    <span><i class="sw" style="background:#fff;border:1px solid #ddd;border-left:4px dashed var(--accent)"></i>⏳ Solicitud pendiente</span>
     <span>⏱ Horas extras a cambiar</span>
     <span><i class="sw" style="background:#fde2e2;border:1px solid #f3b4b4"></i>🎉 Día festivo</span>
     <span style="color:var(--bad)">“N aus.” = más ausentes que el máximo permitido (${S.settings.maxOff})</span>
