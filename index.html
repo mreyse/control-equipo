@@ -108,6 +108,9 @@ table.xl td.tday{box-shadow:inset 0 0 0 2px var(--accent)}
 @media(max-width:900px){.grid4{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}aside{width:64px}aside h1,aside .tools,.nav .t{display:none}}
 #login{position:fixed;inset:0;background:var(--side);display:none;align-items:center;justify-content:center;z-index:100}
 #login.show{display:flex}
+#login .lcheck{color:#c9d1e0;font-size:15px;display:none}
+#login.checking .lcheck{display:block}
+#login.checking .lbox{display:none}
 #login .lbox{background:#fff;border-radius:12px;padding:28px;width:min(360px,92vw);display:flex;flex-direction:column;gap:12px}
 #login h2{margin:0}
 body.locked .app{filter:blur(6px);pointer-events:none}
@@ -181,7 +184,7 @@ body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
   <main id="main"></main>
 </div>
 
-<div id="login"><form class="lbox" onsubmit="return doLogin(event)">
+<div id="login" class="show checking"><div class="lcheck">Cargando…</div><form class="lbox" onsubmit="return doLogin(event)">
   <h2>Control de Equipo</h2><p class="muted" style="margin-top:0">Servicios de Colaboración · inicia sesión</p>
   <label class="f">Correo<input id="lEmail" type="email" autocomplete="username" required></label>
   <label class="f">Contraseña<input id="lPass" type="password" autocomplete="current-password" required></label>
@@ -881,6 +884,7 @@ render();
 /* ================== Inicio de sesión y sincronización ================== */
 function setSync(t){ const el=document.getElementById('syncState'); if(el) el.textContent=t; }
 function showLogin(msg){
+  document.getElementById('login').classList.remove('checking');
   document.getElementById('login').classList.add('show'); document.body.classList.add('locked');
   document.getElementById('loginErr').textContent = msg||'';
 }
@@ -903,7 +907,7 @@ function resetPass(){
   firebase.initializeApp(FIREBASE_CONFIG);
   const auth = firebase.auth();
   auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>auth.setPersistence(firebase.auth.Auth.Persistence.NONE));
-  showLogin('');
+  document.body.classList.add('locked');
   auth.onAuthStateChanged(user=>{
     fbUser = user;
     if(!user){ isEditor=false; document.body.classList.remove('ro'); showLogin(''); return; }
