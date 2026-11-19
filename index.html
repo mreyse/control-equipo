@@ -178,6 +178,10 @@ body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
 .wdh{font-size:13px;margin-bottom:6px;color:var(--muted)}.wdh b{color:var(--ink);font-size:15px}
 .agenda .wd{border:1px solid var(--line);border-radius:10px;min-height:0;margin-bottom:8px}
 .lnk{cursor:pointer}.lnk:hover{color:var(--accent);text-decoration:underline}
+.tcols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.tcols>div{min-width:0}
+.tcols .tlabel{text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-size:11px;margin-bottom:8px;padding:0}
+@media(max-width:700px){.tcols{grid-template-columns:1fr;gap:10px}}
 .trow{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:10px 0;border-top:1px solid var(--line);align-items:start}
 .trow:first-of-type{border-top:0}
 .tlabel{font-weight:700;font-size:13px;padding-top:3px}
@@ -411,14 +415,15 @@ function render(){ const f = {dashboard,calendar,vacations,oncall,schedules,team
 function todayShifts(t){
   const keep=ui.calMember; ui.calMember=''; const W=whoOn(t); ui.calMember=keep;
   const H=S.rotation.hours;
-  const pill = (m, extra) => `<span class="tpill"><span class="dot" style="background:${m.color}"></span>${esc(m.name)}${extra?`<span class="muted" style="font-size:11px;margin-left:5px">${extra}</span>`:''}</span>`;
-  const tag = (r, n, label) => `<span class="covt" style="background:${SHIFT_COLORS[r]||'#eef1f6'};border:1px solid #e3e7ee">${label||r}${H[r]?` <span style="font-weight:400;opacity:.75">${H[r].start}–${H[r].end}</span>`:''} <span class="covn">${n}</span></span>`;
+  const li = (m, extra) => `<li><span class="dot" style="background:${m.color}"></span>${esc(m.name)}${extra?`<span class="muted" style="font-size:11px;margin-left:5px">${extra}</span>`:''}</li>`;
+  const block = (r, list, label, extraFn) => `<div class="covl"><div class="covt" style="background:${SHIFT_COLORS[r]||'#eef1f6'}">${label||r}${H[r]?` <span style="font-weight:400;opacity:.75">${H[r].start}–${H[r].end}</span>`:''} <span class="covn">${list.length}</span></div><ul>${list.length?list.map(m=>li(m, extraFn?extraFn(m):'')).join(''):'<li style="color:var(--bad)">Sin cubrir</li>'}</ul></div>`;
   const covers = COVER.filter(r=>(W[r]||[]).length || (!holidayOn(t) && expectedShift(r,t)));
-  const row1 = covers.length ? `<div class="trow"><div class="tlabel">Turnos</div><div class="tcov">${covers.map(r=>{ const L=W[r]||[]; return `<div>${tag(r,L.length)}<div class="tnames">${L.length?L.map(m=>pill(m)).join(''):'<span style="color:var(--bad)">Sin cubrir</span>'}</div></div>`; }).join('')}</div></div>` : '';
   const of = W['Oficina']||[], ho = W['Home office']||[], fx = W['Horario fijo']||[];
-  const row2 = (of.length||ho.length) ? `<div class="trow"><div class="tlabel">Oficina</div><div>${of.length?`<div>${tag('Oficina',of.length)}<div class="tnames">${of.map(m=>pill(m)).join('')}</div></div>`:''}${ho.length?`<div style="margin-top:6px">${tag('Home office',ho.length)}<div class="tnames">${ho.map(m=>pill(m)).join('')}</div></div>`:''}</div></div>` : '';
-  const row3 = fx.length ? `<div class="trow"><div class="tlabel">Horario fijo</div><div>${tag('Horario fijo',fx.length)}<div class="tnames">${fx.map(m=>pill(m, m.fixed?`${m.fixed.start}–${m.fixed.end}`:'')).join('')}</div></div></div>` : '';
-  return `<div class="panel"><h3>Turnos de hoy</h3>${holidayOn(t)?`<p class="muted">Hoy es día festivo.</p>`:''}${row1+row2+row3 || '<span class="muted">Nadie programado hoy</span>'}</div>`;
+  const col1 = covers.map(r=>block(r, W[r]||[])).join('') || '<span class="muted">—</span>';
+  const col2 = (of.length?block('Oficina',of):'') + (ho.length?block('Home office',ho):'') || '<span class="muted">—</span>';
+  const col3 = fx.length ? block('Horario fijo', fx, null, m=>m.fixed?`${m.fixed.start}–${m.fixed.end}`:'') : '<span class="muted">—</span>';
+  return `<div class="panel"><h3>Turnos de hoy</h3>${holidayOn(t)?`<p class="muted">Hoy es día festivo.</p>`:''}
+    <div class="tcols"><div><div class="tlabel">Turnos</div>${col1}</div><div><div class="tlabel">Oficina</div>${col2}</div><div><div class="tlabel">Horario fijo</div>${col3}</div></div></div>`;
 }
 function dashboard(){
   const t = todayS(), yr = new Date().getFullYear();
