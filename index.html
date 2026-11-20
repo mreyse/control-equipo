@@ -1428,6 +1428,7 @@ function resetPass(){
       if(v){ lastRemote = v; applyingRemote=true; S = hydrate(v); rotCache=new Map(); try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} render(); applyingRemote=false; setSync('✓ Sincronizado');
         let ch=false;
         if(isEditor && !S.mig4){ S.rotation.hours = NEW_HOURS(); S.mig4 = true; ch=true; }
+        if(isEditor && !S.mig6){ (S.rotation.breaks||[]).forEach(b=>{ if(b.end==='2027-03-21' && b.returnPos===7){ b.end='2027-02-28'; } }); S.mig6 = true; ch=true; }
         if(isEditor && !S.mig5){ const t=S.rotation.positions.find(p=>p.name==='Tarde'); if(t && t.days[1]==='Descanso') t.days[1]='Oficina'; S.mig5 = true; ch=true; }
         if(ch){ save(); render(); } }
       else if(isEditor){ save(); toast('Datos subidos a la nube por primera vez'); }
