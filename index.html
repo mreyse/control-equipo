@@ -1406,7 +1406,7 @@ function schedules(){
       <button class="btn sec" onclick="rotForm()">⚙️ Rotación</button>
     </div></div>
   ${needTeam()}
-  ${S.members.length?`<div class="panel mhwrap"><table class="mh">${mhHead(week,'Ingeniero')}${rows}</table>
+  ${S.members.length?`<div class="panel mhwrap"><p class="mhsub">Horario Colaboración</p><table class="mh">${mhHead(week,'Ingeniero')}${rows}</table>
     ${out.length?`<p class="muted" style="margin:12px 0 0;font-size:13px">Fuera de la rotación esta semana: ${out.map(id=>{ const b=R.breaks.find(b=>b.memberId===id&&inRange(week[0],mondayOf(b.start),b.end)); return `<b>${esc(mName(id))}</b>${b?` · ${esc(b.reason||'pausa')} hasta ${nice(b.end)}, regresa como ${esc(R.positions[b.returnPos]?.name||'último rol')}`:''}`; }).join(', ')}</p>`:''}
   </div>
   ${fixedTable(week)}
@@ -1417,7 +1417,7 @@ function fixedTable(week){
   const order = ['Colaboración','MM','Desarrollo'];
   const fx = S.members.filter(m=>m.shifts===false && m.fixed).sort((a,b)=>order.indexOf(a.group)-order.indexOf(b.group) || a.name.localeCompare(b.name));
   if(!fx.length) return '';
-  const rows = fx.map(m=>{ let hrs=0;
+  const rowFor = m=>{ let hrs=0;
     const cells = week.map((s,i)=>{
       const vac=S.vacations.find(v=>v.memberId===m.id&&v.status==='Aprobada'&&!isHX(v)&&inRange(s,v.start,v.end));
       const ov=S.rotation.overrides[m.id+'|'+s];
@@ -1427,8 +1427,9 @@ function fixedTable(week){
       if(m.fixed.days.includes(i)){ hrs+=workHours(m.fixed.start,m.fixed.end); return mhCell(m.id, s, shortH(m.fixed.start,m.fixed.end), 'fixedh', 'Horario fijo'); }
       return mhCell(m.id, s, '—', 'off', 'Descanso');
     }).join('');
-    return `<tr><td class="l rolec">${esc(m.group||'')}</td><td class="l nm"><span class="dot" style="background:${m.color}"></span>${esc(m.name)}<span class="mrole">${esc(m.group||'')}</span></td>${cells}<td class="hrs">${hrs.toFixed(1).replace('.0','')}</td></tr>`; }).join('');
-  return `<div class="panel mhwrap"><p class="mhsub">Horario fijo</p><table class="mh">${mhHead(week,'Colaborador')}${rows}</table></div>`;
+    return `<tr><td class="l rolec">${esc(m.group||'')}</td><td class="l nm"><span class="dot" style="background:${m.color}"></span>${esc(m.name)}<span class="mrole">${esc(m.group||'')}</span></td>${cells}<td class="hrs">${hrs.toFixed(1).replace('.0','')}</td></tr>`; };
+  const sets = [['Soporte Colaboración', fx.filter(m=>m.group!=='MM')], ['MM', fx.filter(m=>m.group==='MM')]];
+  return sets.filter(([,list])=>list.length).map(([title,list])=>`<div class="panel mhwrap"><p class="mhsub">${title}</p><table class="mh">${mhHead(week,'Colaborador')}${list.map(rowFor).join('')}</table></div>`).join('');
 }
 function cellEdit(mid, s){
   const ov = S.rotation.overrides[mid+'|'+s];
