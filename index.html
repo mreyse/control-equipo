@@ -216,6 +216,8 @@ body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
 .nrow3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px 12px}
 @media(max-width:700px){.nrow3{grid-template-columns:1fr 1fr}.nrow3 label:first-child{grid-column:1/-1}}
 .hols{border-left:4px solid #d64545}
+.hrow{justify-content:flex-start;align-items:center;gap:12px}
+.hemoji{font-size:26px;width:46px;height:46px;border-radius:50%;background:#fde2e2;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
 .hchip{display:inline-block;background:#fde2e2;color:#b42318;border-radius:6px;padding:1px 7px;font-size:12px;margin-left:4px;white-space:nowrap}
 .uvgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
 .uvcard{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;font:inherit;color:inherit}
@@ -750,15 +752,22 @@ function stopAs(){
   isEditor = !!ui.realEditor; ui.asMember = null; document.body.classList.toggle('ro', !isEditor);
   go('userview');
 }
+function holidayEmoji(name){
+  const n=(name||'').toLowerCase();
+  const M=[['año nuevo','🎆'],['constituci','📜'],['juárez','⚖️'],['juarez','⚖️'],['trabajo','👷'],['independencia','🔔'],['revoluci','🐎'],['navidad','🎄'],['nochebuena','🌟'],['poder ejecutivo','🏛️'],['santo','✝️'],['pascua','🐣'],['guadalupe','🌹'],['muertos','💀'],['madre','💐'],['padre','👔'],['fin de año','🥂'],['31 dic','🥂']];
+  const f=M.find(([k])=>n.includes(k)); return f?f[1]:'🎉';
+}
 function holidaysPanel(t){
   const y=+t.slice(0,4), today=holidayOn(t);
-  const next=holidaysOfYear(y).filter(h=>h.date>t && h.date.slice(0,7)===t.slice(0,7));
-  if(!today && !next.length) return '';
+  const all=[...holidaysOfYear(y),...holidaysOfYear(y+1)].filter(h=>h.date>t);
+  let list=all.filter(h=>h.date.slice(0,7)===t.slice(0,7));
+  if(!list.length && all.length) list=[all[0]];
+  if(!today && !list.length) return '';
   const when = d => { const x=pd(d); return `${['dom','lun','mar','mié','jue','vie','sáb'][x.getDay()]} ${x.getDate()} ${MONTHS[x.getMonth()].slice(0,3).toLowerCase()}${x.getFullYear()!==y?' '+x.getFullYear():''}`; };
   const left = d => { const n=Math.round((pd(d)-pd(t))/864e5); return n===1?'mañana':`en ${n} días`; };
-  return `<div class="panel notices hols"><h3 style="margin:0">🎉 ${today?'Hoy es día festivo':'Días festivos de '+MONTHS[pd(t).getMonth()].toLowerCase()}</h3>
-    ${today?`<div class="notice"><div>🎉 <b>${esc(today.name)}</b><span class="hchip">📅 hoy</span></div></div>`:''}
-    ${next.map(h=>`<div class="notice"><div>🎉 ${esc(h.name)}<span class="hchip">📅 ${when(h.date)}</span> <span class="muted" style="font-size:12px">${left(h.date)}</span></div></div>`).join('')}</div>`;
+  const row = (h, isToday) => `<div class="notice hrow"><span class="hemoji">${holidayEmoji(h.name)}</span><div><b>${esc(h.name)}</b><span class="hchip">📅 ${isToday?'hoy':when(h.date)}</span>${isToday?'':` <span class="muted" style="font-size:12px">${left(h.date)}</span>`}<div class="muted" style="font-size:12px">${h.official?'Día de descanso obligatorio':'Día festivo de la empresa'}</div></div></div>`;
+  return `<div class="panel notices hols"><h3 style="margin:0">🎉 ${today?'Hoy es día festivo':(list.length>1?'Próximos días festivos':'Próximo día festivo')}</h3>
+    ${today?row(today,true):''}${list.map(h=>row(h,false)).join('')}</div>`;
 }
 function noticesPanel(t){
   const act = activeNotices(t, t).concat((S.notices||[]).filter(n=>n.from && n.from>t)).filter((n,i,a)=>a.indexOf(n)===i);
