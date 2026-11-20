@@ -1001,8 +1001,8 @@ function dashboard(){
     ${isEditor?`<div class="kpi"><div class="n">${S.members.length}</div><div class="l">Integrantes</div></div>`:myNextCard(t)}
     <div class="kpi"><div class="n" style="color:var(--warn)">${pend.length + (isEditor ? reqList().filter(reqNeedsAdmin).length : reqList().filter(r=>(reqMine(r)&&['Pendiente','Esperando compañero','Por aprobar'].includes(r.status))||reqIncoming(r)).length)}</div><div class="l">${isEditor?'Solicitudes pendientes':'Mis solicitudes en trámite'}</div></div>
   </div>
-  ${holidaysPanel(t)}
   ${noticesPanel(t)}
+  ${holidaysPanel(t)}
   <div class="grid2 dtop">
     ${todayShifts(t)}
     ${guardTimeline(t)}
