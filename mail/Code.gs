@@ -178,9 +178,14 @@ function memberDay(mid, s){
   return {label:sh, hours:hh?`${hh.start} – ${hh.end}`:'', h:shiftHours(sh), kind: COVER.includes(sh)?'cover':'work'};
 }
 function fmtNoticeText(t){ return esc(t||'').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>'); }
-function noticeWhen(n){ if(!n.date) return ''; const d=pd(n.date); const dn=['dom','lun','mar','mié','jue','vie','sáb'][d.getDay()]; return `${dn} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3).toLowerCase()}${n.tStart?' · '+n.tStart+(n.tEnd?'–'+n.tEnd:''):''}`; }
+function noticeWhen(n){
+  if(!n.date) return '';
+  const f = s => { const d=pd(s); return `${['dom','lun','mar','mié','jue','vie','sáb'][d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3).toLowerCase()}`; };
+  if(n.dateEnd && n.dateEnd!==n.date) return `${f(n.date)}${n.tStart?' '+n.tStart:''} – ${f(n.dateEnd)}${n.tEnd?' '+n.tEnd:''}`;
+  return `${f(n.date)}${n.tStart?' · '+n.tStart+(n.tEnd?'–'+n.tEnd:''):''}`;
+}
 function noticeHTML(n, email){ const when=noticeWhen(n); const chip = when ? (email ? ` <span style="background:#ffffff;border:1px solid #c7d7f7;border-radius:6px;padding:1px 6px;font-size:12px;white-space:nowrap">📅 ${when}</span>` : ` <span class="nchip">📅 ${when}</span>`) : ''; return `${n.icon||'📣'} ${fmtNoticeText(n.text)}${chip}`; }
-function activeNotices(a, b){ return (S.notices||[]).filter(n=>{ const to = n.to || n.date || null; return (!n.from||n.from<=b) && (!to||to>=a); }).sort((x,y)=>(x.date||'9999').localeCompare(y.date||'9999')); }
+function activeNotices(a, b){ return (S.notices||[]).filter(n=>{ const to = n.to || n.dateEnd || n.date || null; return (!n.from||n.from<=b) && (!to||to>=a); }).sort((x,y)=>(x.date||'9999').localeCompare(y.date||'9999')); }
 function buildWeeklyEmail(mid, today, reqs){
   const m=member(mid); const ws=nextMonday(today); const we=fd(new Date(pd(ws).getTime()+6*864e5));
   const days=[...Array(7)].map((_,i)=>fd(new Date(pd(ws).getFullYear(),pd(ws).getMonth(),pd(ws).getDate()+i)));

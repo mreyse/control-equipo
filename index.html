@@ -213,7 +213,7 @@ body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
 .notices{border-left:4px solid #2f6fed}
 .notice{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
 .notice:first-of-type{border-top:0}
-.nrow3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}
+.nrow3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px 12px}
 @media(max-width:700px){.nrow3{grid-template-columns:1fr 1fr}.nrow3 label:first-child{grid-column:1/-1}}
 .hols{border-left:4px solid #d64545}
 .hchip{display:inline-block;background:#fde2e2;color:#b42318;border-radius:6px;padding:1px 7px;font-size:12px;margin-left:4px;white-space:nowrap}
@@ -489,9 +489,14 @@ function memberDay(mid, s){
 }
 const NOTICE_ICONS = ['📣','🛠️','📅','⚠️','🚨','🎉','ℹ️','☎️','💻','☕'];
 function fmtNoticeText(t){ return esc(t||'').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>'); }
-function noticeWhen(n){ if(!n.date) return ''; const d=pd(n.date); const dn=['dom','lun','mar','mié','jue','vie','sáb'][d.getDay()]; return `${dn} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3).toLowerCase()}${n.tStart?' · '+n.tStart+(n.tEnd?'–'+n.tEnd:''):''}`; }
+function noticeWhen(n){
+  if(!n.date) return '';
+  const f = s => { const d=pd(s); return `${['dom','lun','mar','mié','jue','vie','sáb'][d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3).toLowerCase()}`; };
+  if(n.dateEnd && n.dateEnd!==n.date) return `${f(n.date)}${n.tStart?' '+n.tStart:''} – ${f(n.dateEnd)}${n.tEnd?' '+n.tEnd:''}`;
+  return `${f(n.date)}${n.tStart?' · '+n.tStart+(n.tEnd?'–'+n.tEnd:''):''}`;
+}
 function noticeHTML(n, email){ const when=noticeWhen(n); const chip = when ? (email ? ` <span style="background:#ffffff;border:1px solid #c7d7f7;border-radius:6px;padding:1px 6px;font-size:12px;white-space:nowrap">📅 ${when}</span>` : ` <span class="nchip">📅 ${when}</span>`) : ''; return `${n.icon||'📣'} ${fmtNoticeText(n.text)}${chip}`; }
-function activeNotices(a, b){ return (S.notices||[]).filter(n=>{ const to = n.to || n.date || null; return (!n.from||n.from<=b) && (!to||to>=a); }).sort((x,y)=>(x.date||'9999').localeCompare(y.date||'9999')); }
+function activeNotices(a, b){ return (S.notices||[]).filter(n=>{ const to = n.to || n.dateEnd || n.date || null; return (!n.from||n.from<=b) && (!to||to>=a); }).sort((x,y)=>(x.date||'9999').localeCompare(y.date||'9999')); }
 function buildWeeklyEmail(mid, today, reqs){
   const m=member(mid); const ws=nextMonday(today); const we=fd(new Date(pd(ws).getTime()+6*864e5));
   const days=[...Array(7)].map((_,i)=>fd(new Date(pd(ws).getFullYear(),pd(ws).getMonth(),pd(ws).getDate()+i)));
@@ -777,29 +782,35 @@ function noticeForm(id){
     <textarea id="nText" style="width:100%;min-height:90px" placeholder="Ej. Mantenimiento del **SBC** a las 23:00. Habrá corte de llamadas 🔧">${esc(n.text||'')}</textarea>
     <p class="muted" style="font-size:11px;margin:2px 0 10px">Tip: escribe **texto** para ponerlo en negritas.</p>
     <div class="nrow3">
-      <label class="f">Fecha del evento (opcional)<input type="date" id="nDate" value="${n.date||''}"></label>
+      <label class="f">Inicio del evento (opcional)<input type="date" id="nDate" value="${n.date||''}"></label>
       <label class="f">Hora inicio<input type="time" id="nTS" value="${n.tStart||''}"></label>
+      <span></span>
+      <label class="f">Fin del evento (opcional)<input type="date" id="nDateEnd" value="${n.dateEnd||''}"></label>
       <label class="f">Hora fin<input type="time" id="nTE" value="${n.tEnd||''}"></label>
+      <span></span>
     </div>
     <div class="form" style="margin-top:12px">
       <label class="f">Mostrar desde (opcional)<input type="date" id="nFrom" value="${n.from||''}"></label>
       <label class="f">Mostrar hasta (opcional)<input type="date" id="nTo" value="${n.to||''}"></label>
     </div>
-    <p class="muted" style="font-size:12px">Si pones fecha del evento y no pones "hasta", el aviso se oculta solo después de ese día. Se muestra en el Resumen y en el correo semanal.</p>
+    <p class="muted" style="font-size:12px">Si el evento dura un solo día, deja vacío "Fin del evento". Si no pones "Mostrar hasta", el aviso se oculta solo cuando termina el evento. Se muestra en el Resumen y en el correo semanal.</p>
     <div id="nPrev"></div>
     <div class="actions"><button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="saveNotice('${id||''}')">${id?'Guardar':'Publicar aviso'}</button></div>`);
   ui.nIcon = n.icon||'📣';
-  ['nText','nDate','nTS','nTE'].forEach(k=>document.getElementById(k).addEventListener('input', noticePrev));
+  ['nText','nDate','nDateEnd','nTS','nTE'].forEach(k=>document.getElementById(k).addEventListener('input', noticePrev));
   noticePrev();
 }
 function pickIcon(btn, ic){ ui.nIcon=ic; document.querySelectorAll('#modal .ico').forEach(b=>b.classList.toggle('on', b===btn)); noticePrev(); }
 function insertAtCursor(txt){ const ta=document.getElementById('nText'); const a=ta.selectionStart??ta.value.length, b=ta.selectionEnd??a; ta.value=ta.value.slice(0,a)+txt+ta.value.slice(b); ta.focus(); ta.selectionStart=ta.selectionEnd=a+txt.length; noticePrev(); }
 function wrapBold(){ const ta=document.getElementById('nText'); const a=ta.selectionStart, b=ta.selectionEnd; const sel=ta.value.slice(a,b)||'texto'; ta.value=ta.value.slice(0,a)+'**'+sel+'**'+ta.value.slice(b); ta.focus(); ta.selectionStart=a+2; ta.selectionEnd=a+2+sel.length; noticePrev(); }
-function readNotice(){ const n={icon:ui.nIcon||'📣', text:val('nText').trim()}; ['date','tStart','tEnd','from','to'].forEach((k,i)=>{ const v=val(['nDate','nTS','nTE','nFrom','nTo'][i]); if(v) n[k]=v; }); return n; }
+function readNotice(){ const n={icon:ui.nIcon||'📣', text:val('nText').trim()}; ['date','dateEnd','tStart','tEnd','from','to'].forEach((k,i)=>{ const v=val(['nDate','nDateEnd','nTS','nTE','nFrom','nTo'][i]); if(v) n[k]=v; }); return n; }
 function noticePrev(){ const el=document.getElementById('nPrev'); if(!el) return; const n=readNotice(); el.innerHTML = n.text ? `<div class="panel notices" style="margin:0"><div class="muted" style="font-size:11px;margin-bottom:4px">Vista previa</div>${noticeHTML(n,false)}</div>` : ''; }
 function saveNotice(id){
   const n=readNotice(); if(!n.text) return toast('Escribe el aviso');
   if(n.tEnd && !n.tStart) return toast('Indica la hora de inicio');
+  if(n.dateEnd && !n.date) return toast('Indica la fecha de inicio del evento');
+  if(n.dateEnd && n.dateEnd<n.date) return toast('La fecha de fin es anterior al inicio');
+  if(n.dateEnd===n.date) delete n.dateEnd;
   if(id){ const i=(S.notices||[]).findIndex(x=>x.id===id); if(i<0) return; S.notices[i]=Object.assign({id, createdAt:S.notices[i].createdAt||todayS()}, n); }
   else S.notices=(S.notices||[]).concat([Object.assign({id:uid(), createdAt:todayS()}, n)]);
   save(); closeModal(); render(); toast(id?'Aviso actualizado':'Aviso publicado');

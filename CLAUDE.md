@@ -35,7 +35,7 @@ Ver `database.rules.json`. Resumen: lectura para cualquier autenticado; `/contro
 - `vacations[]`: `{id,memberId,type,start,end,tStart?,tEnd?,status,requestedAt,notes,fromRequest?}`
 - `holidays[]`: festivos de empresa `{date,name}` o desactivación de un oficial `{date,off:true}`.
 - `settings`: `{maxOff, defaultDays:18, guardPhones:{Colaboración,MM}, mail:{enabled,fromName,replyTo}}`
-- `notices[]` (avisos): `{id,text,from?,to?,createdAt}` — se muestran en Resumen y en el correo semanal.
+- `notices[]` (avisos): `{id,icon,text(**negritas**),date?,dateEnd?,tStart?,tEnd?,from?,to?,createdAt}` — se muestran en Resumen y en el correo semanal.
 - `members[].mail` (bool): recibe el correo semanal (apagado por defecto; el propietario decide a quién).
 - `/requests`: `kind` = `vac` | `swap` (turno) | `gswap` (guardia); estados: `Pendiente`, `Esperando compañero`, `Por aprobar`, `Aprobada`, `Rechazada`, `Cancelada`.
 
