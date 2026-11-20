@@ -862,6 +862,22 @@ function saveNotice(id){
   save(); closeModal(); render(); toast(id?'Aviso actualizado':'Aviso publicado');
 }
 function delNotice(id){ if(!confirm('¿Quitar este aviso?')) return; S.notices=(S.notices||[]).filter(n=>n.id!==id); save(); render(); }
+// Acomodo del Resumen por persona (S.settings.dashLayout = {memberId: 'turnos'}); quien no tenga uno ve el general
+const DASH_LAYOUTS = {general:'General (Avisos y festivo arriba)', turnos:'Turnos y guardias primero, Avisos y festivo abajo'};
+function dashLayoutOf(m){ return (m && (S.settings.dashLayout||{})[m.id]) || 'general'; }
+function setDashLayout(mid, v){ const d=Object.assign({}, S.settings.dashLayout||{}); if(!mid) return;
+  if(v==='general') delete d[mid]; else d[mid]=v; S.settings.dashLayout=d; save(); toast('Guardado'); render(); }
+function dashLayoutPanel(){
+  const d=S.settings.dashLayout||{}, custom=S.members.filter(m=>d[m.id]);
+  return `<div class="panel"><h3>🧩 Acomodo del Resumen</h3>
+    <p class="muted" style="margin-top:0">Todos ven el acomodo general. Aquí puedes asignar otro acomodo a personas específicas.</p>
+    ${custom.length?`<table>${custom.map(m=>`<tr><td><span class="dot" style="background:${m.color}"></span>${esc(m.name)}</td><td><select onchange="setDashLayout('${m.id}',this.value)">${Object.entries(DASH_LAYOUTS).map(([k,l])=>`<option value="${k}" ${d[m.id]===k?'selected':''}>${l}</option>`).join('')}</select></td></tr>`).join('')}</table>`:'<p class="muted">Nadie tiene un acomodo personalizado.</p>'}
+    <div class="toolbar" style="margin-top:10px">
+      <select id="dlMember" style="flex:1;min-width:180px"><option value="">Elige una persona…</option>${S.members.filter(m=>!d[m.id]).map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select>
+      <select id="dlLayout" style="flex:2;min-width:220px">${Object.entries(DASH_LAYOUTS).filter(([k])=>k!=='general').map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select>
+      <button class="btn" onclick="setDashLayout(val('dlMember'),val('dlLayout'))">+ Asignar</button>
+    </div></div>`;
+}
 function mailPanel(){
   const M=Object.assign({enabled:true, fromName:'Agenda Colaboración', replyTo:''}, S.settings.mail||{});
   const withMail=S.members.filter(m=>m.email);
@@ -1007,12 +1023,8 @@ function dashboard(){
     ${isEditor?`<div class="kpi"><div class="n">${S.members.length}</div><div class="l">Integrantes</div></div>`:myNextCard(t)}
     <div class="kpi"><div class="n" style="color:var(--warn)">${pend.length + (isEditor ? reqList().filter(reqNeedsAdmin).length : reqList().filter(r=>(reqMine(r)&&['Pendiente','Esperando compañero','Por aprobar'].includes(r.status))||reqIncoming(r)).length)}</div><div class="l">${isEditor?'Solicitudes pendientes':'Mis solicitudes en trámite'}</div></div>
   </div>
-  ${noticesPanel(t)}
-  ${holidaysPanel(t)}
-  <div class="grid2 dtop">
-    ${todayShifts(t)}
-    ${guardTimeline(t)}
-  </div>
+  ${(()=>{ const info=noticesPanel(t)+holidaysPanel(t), row=`<div class="grid2 dtop">${todayShifts(t)}${guardTimeline(t)}</div>`;
+     return dashLayoutOf(myMember())==='turnos' ? row+info : info+row; })()}
   <div class="panel"><h3>Ausencias próximas (30 días)</h3>
       ${upcoming.length? `<table>${upcoming.map(v=>`<tr><td><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))}</td><td>${esc(v.type)}</td><td class="muted">${nice(v.start)} – ${nice(v.end)}</td></tr>`).join('')}</table>` : '<div class="empty">Nadie ausente en los próximos 30 días</div>'}
     </div>
@@ -1631,6 +1643,7 @@ function settings(){
       <button class="btn" onclick="addEditor()">+ Agregar administrador</button>
     </div></div>`:''}
   ${holidayPanel()}
+  ${dashLayoutPanel()}
   ${mailPanel()}
   <div class="panel"><h3>Reglas</h3>
     <div class="form" style="max-width:600px">
