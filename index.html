@@ -863,7 +863,7 @@ function saveNotice(id){
 }
 function delNotice(id){ if(!confirm('¿Quitar este aviso?')) return; S.notices=(S.notices||[]).filter(n=>n.id!==id); save(); render(); }
 // Acomodo del Resumen por persona (S.settings.dashLayout = {memberId: 'turnos'}); quien no tenga uno ve el general
-const DASH_LAYOUTS = {general:'General (Avisos y festivo arriba)', turnos:'Turnos y guardias primero, Avisos y festivo abajo'};
+const DASH_LAYOUTS = {general:'General (Avisos y festivo arriba)', turnos:'Turnos, guardias y ausencias primero; Avisos y festivo abajo'};
 function dashLayoutOf(m){ return (m && (S.settings.dashLayout||{})[m.id]) || 'general'; }
 function setDashLayout(mid, v){ const d=Object.assign({}, S.settings.dashLayout||{}); if(!mid) return;
   if(v==='general') delete d[mid]; else d[mid]=v; S.settings.dashLayout=d; save(); toast('Guardado'); render(); }
@@ -1024,10 +1024,10 @@ function dashboard(){
     <div class="kpi"><div class="n" style="color:var(--warn)">${pend.length + (isEditor ? reqList().filter(reqNeedsAdmin).length : reqList().filter(r=>(reqMine(r)&&['Pendiente','Esperando compañero','Por aprobar'].includes(r.status))||reqIncoming(r)).length)}</div><div class="l">${isEditor?'Solicitudes pendientes':'Mis solicitudes en trámite'}</div></div>
   </div>
   ${(()=>{ const info=noticesPanel(t)+holidaysPanel(t), row=`<div class="grid2 dtop">${todayShifts(t)}${guardTimeline(t)}</div>`;
-     return dashLayoutOf(myMember())==='turnos' ? row+info : info+row; })()}
-  <div class="panel"><h3>Ausencias próximas (30 días)</h3>
+     const aus=`<div class="panel"><h3>Ausencias próximas (30 días)</h3>
       ${upcoming.length? `<table>${upcoming.map(v=>`<tr><td><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))}</td><td>${esc(v.type)}</td><td class="muted">${nice(v.start)} – ${nice(v.end)}</td></tr>`).join('')}</table>` : '<div class="empty">Nadie ausente en los próximos 30 días</div>'}
-    </div>
+    </div>`;
+     return dashLayoutOf(myMember())==='turnos' ? row+aus+info : info+row+aus; })()}
   <div class="grid2">
     ${isEditor?`<div class="panel"><h3>Pendientes de aprobar</h3>
       ${adminRequestsHTML()}
