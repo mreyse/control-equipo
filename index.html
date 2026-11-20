@@ -265,7 +265,9 @@ body.ro .asbar .btn{display:inline-block!important}
 .covt{display:inline-block;border-radius:4px;padding:1px 6px;font-weight:600;font-size:11px;margin-right:2px}
 .pchip{display:inline-flex;align-items:center;margin:0 10px 4px 0}
 .mhwrap{overflow-x:auto}
-table.mh{width:100%;border-collapse:collapse;font-size:13px;min-width:860px}
+table.mh{width:100%;border-collapse:collapse;font-size:13px;min-width:860px;table-layout:fixed}
+table.mh col.c-rol{width:90px}table.mh col.c-nm{width:200px}table.mh col.c-h{width:50px}
+table.mh th{white-space:normal!important}table.mh td.nm{overflow:hidden;text-overflow:ellipsis}
 table.mh th{font-weight:400;color:var(--muted);font-size:12px;padding:8px 6px;text-align:center;border-bottom:1px solid #d5dae3;white-space:nowrap;text-transform:none;letter-spacing:0}
 table.mh th b{display:block;font-weight:600;color:var(--ink);font-size:13px}
 table.mh th.l,table.mh td.l{text-align:left}
@@ -292,7 +294,7 @@ table.mh .mrole{display:none}
 .ovm{position:absolute;bottom:3px;right:5px;font-size:10px;color:var(--accent)}
 .mhsub{margin:0 0 6px;font-size:13px;color:var(--muted);font-weight:600}
 .mhlegend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12px;color:var(--muted);margin-top:4px;align-items:center}
-@media(max-width:700px){table.mh{min-width:640px}table.mh .rolec,table.mh th:first-child{display:none}table.mh .mrole{display:block;font-size:10.5px;color:var(--muted)}table.mh td.nm{position:sticky;left:0;background:#fff;z-index:1}}
+@media(max-width:700px){table.mh{min-width:640px;table-layout:auto}table.mh col{width:auto!important}table.mh .rolec,table.mh th:first-child{display:none}table.mh .mrole{display:block;font-size:10.5px;color:var(--muted)}table.mh td.nm{position:sticky;left:0;background:#fff;z-index:1}}
 @media print{aside,.toolbar,button{display:none!important}main{padding:0}}
 </style>
 </head>
@@ -1404,7 +1406,7 @@ function fixedLabel(m){ const h=m.fixed.start+'-'+m.fixed.end;
 const shortH = (a,b) => { const f=x=>x.endsWith(':00')?x.slice(0,2).replace(/^0/,'0'):x; return `${f(a)}–${f(b)}`; };
 function mhHead(week, first){
   const t=todayS();
-  return `<tr><th class="l">Rol</th><th class="l">${first}</th>${week.map((s,i)=>{ const h=holidayOn(s); const d=pd(s);
+  return `<colgroup><col class="c-rol"><col class="c-nm">${week.map(()=>'<col>').join('')}<col class="c-h"></colgroup><tr><th class="l">Rol</th><th class="l">${first}</th>${week.map((s,i)=>{ const h=holidayOn(s); const d=pd(s);
     return `<th class="${s===t?'today':''} ${h?'hol':''}"><b>${DAYS[i]} ${d.getDate()}</b>${h?esc(h.name):(s===t?'hoy':MONTHS[d.getMonth()].slice(0,3).toLowerCase())}</th>`; }).join('')}<th>h</th></tr>`;
 }
 function mhCell(mid, s, content, cls, title){
