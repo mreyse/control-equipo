@@ -13,7 +13,7 @@ NAMES = ['DAYS','MONTHS','HX','GUARD_PHONES_DEFAULT','MEAL_H','NEW_HOURS','blank
  'pd','fd','nice','dow','eachDay','_holCache','nthMonday','officialHolidays','holidaysOfYear','holidayOn',
  'businessDays','overlaps','inRange','member','mName','esc','isHX','usedDays','offOn','SHIFT_COLORS','COVER',
  'mondayOf','weekIdx','mod','rotCache','onBreak','lineup','positionOf','memberAtPos','roleShift','shiftOf',
- 'workHours','shiftHours','hoursBetween','guardPhone','fmtPhone','nextMonday','memberDay','activeNotices','buildWeeklyEmail']
+ 'workHours','shiftHours','hoursBetween','guardPhone','fmtPhone','nextMonday','memberDay','fmtNoticeText','noticeWhen','noticeHTML','activeNotices','buildWeeklyEmail']
 
 def balanced(text):
     depth = 0

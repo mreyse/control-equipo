@@ -177,7 +177,10 @@ function memberDay(mid, s){
   const hh=S.rotation.hours[sh];
   return {label:sh, hours:hh?`${hh.start} – ${hh.end}`:'', h:shiftHours(sh), kind: COVER.includes(sh)?'cover':'work'};
 }
-function activeNotices(a, b){ return (S.notices||[]).filter(n=>(!n.from||n.from<=b) && (!n.to||n.to>=a)); }
+function fmtNoticeText(t){ return esc(t||'').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>'); }
+function noticeWhen(n){ if(!n.date) return ''; const d=pd(n.date); const dn=['dom','lun','mar','mié','jue','vie','sáb'][d.getDay()]; return `${dn} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3).toLowerCase()}${n.tStart?' · '+n.tStart+(n.tEnd?'–'+n.tEnd:''):''}`; }
+function noticeHTML(n, email){ const when=noticeWhen(n); const chip = when ? (email ? ` <span style="background:#ffffff;border:1px solid #c7d7f7;border-radius:6px;padding:1px 6px;font-size:12px;white-space:nowrap">📅 ${when}</span>` : ` <span class="nchip">📅 ${when}</span>`) : ''; return `${n.icon||'📣'} ${fmtNoticeText(n.text)}${chip}`; }
+function activeNotices(a, b){ return (S.notices||[]).filter(n=>{ const to = n.to || n.date || null; return (!n.from||n.from<=b) && (!to||to>=a); }).sort((x,y)=>(x.date||'9999').localeCompare(y.date||'9999')); }
 function buildWeeklyEmail(mid, today, reqs){
   const m=member(mid); const ws=nextMonday(today); const we=fd(new Date(pd(ws).getTime()+6*864e5));
   const days=[...Array(7)].map((_,i)=>fd(new Date(pd(ws).getFullYear(),pd(ws).getMonth(),pd(ws).getDate()+i)));
@@ -215,7 +218,7 @@ function buildWeeklyEmail(mid, today, reqs){
     ${sec('Tus solicitudes y vacaciones', `<p style="margin:0;font-size:13px;color:${C.mut}">${R.map(r=>`${r.kind==='vac'?esc(r.type)+' '+nice(r.start)+(r.end&&r.end!==r.start?' – '+nice(r.end):''):(r.kind==='swap'?'Intercambio de turno':'Intercambio de guardia')} · <span style="color:${C.warn}">${esc(r.status)}</span>`).join('<br>')}${R.length?'<br>':''}Saldo ${yr}: ${tot-used} de ${tot} días hábiles disponibles.</p>`)}
     <div style="border-top:1px solid ${C.line};margin-top:18px">
     ${sec('Del equipo la próxima semana', `<p style="margin:0;font-size:13px;color:${C.mut}">${coverTxt?coverTxt+'<br>':''}${gTeam}${aus.length?'<br>Ausentes: '+aus.join(', '):''}</p>`)}
-    ${nots.length?`<div style="margin-top:12px;background:${C.bluebg};border-radius:8px;padding:10px 14px;color:${C.blue}"><b>📣 Avisos</b><br>${nots.map(n=>esc(n.text)).join('<br>')}</div>`:''}
+    ${nots.length?`<div style="margin-top:12px;background:${C.bluebg};border-radius:8px;padding:10px 14px;color:${C.blue}"><b>📣 Avisos</b><br>${nots.map(n=>noticeHTML(n,true)).join('<br>')}</div>`:''}
     </div>
     <p style="margin:20px 0 0;font-size:12px;color:${C.mut}">Consulta todo en <a href="https://mreyse.github.io/control-equipo/" style="color:${C.blue}">mreyse.github.io/control-equipo</a>. Este correo se envía automáticamente cada viernes.</p>
   </div></div>`;

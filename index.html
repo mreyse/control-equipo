@@ -213,6 +213,18 @@ body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
 .notices{border-left:4px solid #2f6fed}
 .notice{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
 .notice:first-of-type{border-top:0}
+.nrow3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}
+@media(max-width:700px){.nrow3{grid-template-columns:1fr 1fr}.nrow3 label:first-child{grid-column:1/-1}}
+.hols{border-left:4px solid #d64545}
+.hchip{display:inline-block;background:#fde2e2;color:#b42318;border-radius:6px;padding:1px 7px;font-size:12px;margin-left:4px;white-space:nowrap}
+.icopick{display:flex;flex-wrap:wrap;gap:4px}
+.ico{font-size:18px;background:#fff;border:1px solid var(--line);border-radius:8px;width:38px;height:36px;cursor:pointer}
+.ico.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.ntool{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 6px}
+.ntime{display:inline-flex;gap:4px;align-items:center}.ntime input{padding:4px 6px}
+.emojibox{display:grid;grid-template-columns:repeat(auto-fill,minmax(36px,1fr));gap:2px;border:1px solid var(--line);border-radius:8px;padding:6px;margin-bottom:6px;max-height:140px;overflow:auto}
+.emojibox button{font-size:18px;background:none;border:0;cursor:pointer;border-radius:6px;padding:4px}.emojibox button:hover{background:var(--accent-soft)}
+.nchip{display:inline-block;background:var(--accent-soft);color:#1f4fb8;border-radius:6px;padding:1px 7px;font-size:12px;margin-left:4px;white-space:nowrap}
 .mailgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:6px}
 .mailp{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px}
 .gslot{display:flex;align-items:center;gap:9px;min-width:0}
@@ -468,7 +480,11 @@ function memberDay(mid, s){
   const hh=S.rotation.hours[sh];
   return {label:sh, hours:hh?`${hh.start} – ${hh.end}`:'', h:shiftHours(sh), kind: COVER.includes(sh)?'cover':'work'};
 }
-function activeNotices(a, b){ return (S.notices||[]).filter(n=>(!n.from||n.from<=b) && (!n.to||n.to>=a)); }
+const NOTICE_ICONS = ['📣','🛠️','📅','⚠️','🚨','🎉','ℹ️','☎️','💻','☕'];
+function fmtNoticeText(t){ return esc(t||'').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>'); }
+function noticeWhen(n){ if(!n.date) return ''; const d=pd(n.date); const dn=['dom','lun','mar','mié','jue','vie','sáb'][d.getDay()]; return `${dn} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3).toLowerCase()}${n.tStart?' · '+n.tStart+(n.tEnd?'–'+n.tEnd:''):''}`; }
+function noticeHTML(n, email){ const when=noticeWhen(n); const chip = when ? (email ? ` <span style="background:#ffffff;border:1px solid #c7d7f7;border-radius:6px;padding:1px 6px;font-size:12px;white-space:nowrap">📅 ${when}</span>` : ` <span class="nchip">📅 ${when}</span>`) : ''; return `${n.icon||'📣'} ${fmtNoticeText(n.text)}${chip}`; }
+function activeNotices(a, b){ return (S.notices||[]).filter(n=>{ const to = n.to || n.date || null; return (!n.from||n.from<=b) && (!to||to>=a); }).sort((x,y)=>(x.date||'9999').localeCompare(y.date||'9999')); }
 function buildWeeklyEmail(mid, today, reqs){
   const m=member(mid); const ws=nextMonday(today); const we=fd(new Date(pd(ws).getTime()+6*864e5));
   const days=[...Array(7)].map((_,i)=>fd(new Date(pd(ws).getFullYear(),pd(ws).getMonth(),pd(ws).getDate()+i)));
@@ -506,7 +522,7 @@ function buildWeeklyEmail(mid, today, reqs){
     ${sec('Tus solicitudes y vacaciones', `<p style="margin:0;font-size:13px;color:${C.mut}">${R.map(r=>`${r.kind==='vac'?esc(r.type)+' '+nice(r.start)+(r.end&&r.end!==r.start?' – '+nice(r.end):''):(r.kind==='swap'?'Intercambio de turno':'Intercambio de guardia')} · <span style="color:${C.warn}">${esc(r.status)}</span>`).join('<br>')}${R.length?'<br>':''}Saldo ${yr}: ${tot-used} de ${tot} días hábiles disponibles.</p>`)}
     <div style="border-top:1px solid ${C.line};margin-top:18px">
     ${sec('Del equipo la próxima semana', `<p style="margin:0;font-size:13px;color:${C.mut}">${coverTxt?coverTxt+'<br>':''}${gTeam}${aus.length?'<br>Ausentes: '+aus.join(', '):''}</p>`)}
-    ${nots.length?`<div style="margin-top:12px;background:${C.bluebg};border-radius:8px;padding:10px 14px;color:${C.blue}"><b>📣 Avisos</b><br>${nots.map(n=>esc(n.text)).join('<br>')}</div>`:''}
+    ${nots.length?`<div style="margin-top:12px;background:${C.bluebg};border-radius:8px;padding:10px 14px;color:${C.blue}"><b>📣 Avisos</b><br>${nots.map(n=>noticeHTML(n,true)).join('<br>')}</div>`:''}
     </div>
     <p style="margin:20px 0 0;font-size:12px;color:${C.mut}">Consulta todo en <a href="https://mreyse.github.io/control-equipo/" style="color:${C.blue}">mreyse.github.io/control-equipo</a>. Este correo se envía automáticamente cada viernes.</p>
   </div></div>`;
@@ -694,21 +710,65 @@ function render(){ const f = {dashboard,calendar,vacations,oncall,schedules,team
 }
 
 /* ================== Vista: Resumen ================== */
+function holidaysPanel(t){
+  const y=+t.slice(0,4), today=holidayOn(t);
+  const next=[...holidaysOfYear(y),...holidaysOfYear(y+1)].filter(h=>h.date>t).slice(0,3);
+  if(!today && !next.length) return '';
+  const when = d => { const x=pd(d); return `${['dom','lun','mar','mié','jue','vie','sáb'][x.getDay()]} ${x.getDate()} ${MONTHS[x.getMonth()].slice(0,3).toLowerCase()}${x.getFullYear()!==y?' '+x.getFullYear():''}`; };
+  const left = d => { const n=Math.round((pd(d)-pd(t))/864e5); return n===1?'mañana':`en ${n} días`; };
+  return `<div class="panel notices hols"><h3 style="margin:0">🎉 ${today?'Hoy es día festivo':'Próximos días festivos'}</h3>
+    ${today?`<div class="notice"><div>🎉 <b>${esc(today.name)}</b><span class="hchip">📅 hoy</span></div></div>`:''}
+    ${next.map(h=>`<div class="notice"><div>🎉 ${esc(h.name)}<span class="hchip">📅 ${when(h.date)}</span> <span class="muted" style="font-size:12px">${left(h.date)}</span></div></div>`).join('')}</div>`;
+}
 function noticesPanel(t){
   const act = activeNotices(t, t).concat((S.notices||[]).filter(n=>n.from && n.from>t)).filter((n,i,a)=>a.indexOf(n)===i);
   if(!act.length && !isEditor) return '';
   return `<div class="panel notices"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 style="margin:0">📣 Avisos</h3>${isEditor?'<button class="btn sec sm" onclick="noticeForm()">+ Aviso</button>':''}</div>
-    ${act.length?act.map(n=>`<div class="notice"><div>${esc(n.text)}${n.from||n.to?`<div class="muted" style="font-size:11px">${n.from?'Desde '+nice(n.from):''}${n.from&&n.to?' · ':''}${n.to?'Hasta '+nice(n.to):''}</div>`:''}</div>${isEditor?`<button class="btn sec sm" onclick="delNotice('${n.id}')" title="Quitar aviso">✕</button>`:''}</div>`).join(''):'<p class="muted" style="margin:8px 0 0">No hay avisos. Lo que escribas aquí también aparece en el correo semanal.</p>'}</div>`;
+    ${act.length?act.map(n=>`<div class="notice"><div>${noticeHTML(n,false)}${n.from||n.to?`<div class="muted" style="font-size:11px">${n.from?'Desde '+nice(n.from):''}${n.from&&n.to?' · ':''}${n.to?'Hasta '+nice(n.to):''}</div>`:''}</div>${isEditor?`<span style="white-space:nowrap"><button class="btn sec sm" onclick="noticeForm('${n.id}')" title="Editar aviso">✏️</button> <button class="btn sec sm" onclick="delNotice('${n.id}')" title="Quitar aviso">✕</button></span>`:''}</div>`).join(''):'<p class="muted" style="margin:8px 0 0">No hay avisos. Lo que escribas aquí también aparece en el correo semanal.</p>'}</div>`;
 }
-function noticeForm(){
-  openModal(`<h3>Nuevo aviso</h3><div class="form">
-    <label class="f full">Aviso<textarea id="nText" placeholder="Mantenimiento del SBC el jueves a las 23:00"></textarea></label>
-    <label class="f">Mostrar desde (opcional)<input type="date" id="nFrom"></label>
-    <label class="f">Hasta (opcional)<input type="date" id="nTo"></label></div>
-    <p class="muted" style="font-size:12px">Se muestra en el Resumen y en el correo semanal mientras esté vigente.</p>
-    <div class="actions"><button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="saveNotice()">Publicar aviso</button></div>`);
+const EMOJIS = ['📣','🛠️','📅','⚠️','🚨','🎉','ℹ️','✅','❌','⏰','🕘','📞','☎️','💻','🖥️','🔧','🔒','📌','📍','👉','👥','🤝','🙌','👏','🎂','☕','🍕','🏖️','🌴','🤒','🔄','📈','📉','💡','❗','❓','🟢','🟡','🔴','🔵'];
+function noticeForm(id){
+  const n = id ? (S.notices||[]).find(x=>x.id===id) : {icon:'📣', text:''};
+  if(!n) return;
+  openModal(`<h3>${id?'Editar':'Nuevo'} aviso</h3>
+    <div class="f" style="margin-bottom:10px"><span class="f" style="margin-bottom:4px">Ícono</span><div class="icopick">${NOTICE_ICONS.map(ic=>`<button type="button" class="ico ${ic===(n.icon||'📣')?'on':''}" onclick="pickIcon(this,'${ic}')">${ic}</button>`).join('')}</div></div>
+    <label class="f">Aviso</label>
+    <div class="ntool">
+      <button type="button" class="btn sec sm" onclick="wrapBold()" title="Negritas"><b>B</b></button>
+      <button type="button" class="btn sec sm" onclick="document.getElementById('emojiBox').classList.toggle('hidden')" title="Emojis">😀 Emojis</button>
+      <span class="ntime"><input type="time" id="nIns" value="09:00"><button type="button" class="btn sec sm" onclick="insertAtCursor(val('nIns'))">🕘 Insertar hora</button></span>
+    </div>
+    <div id="emojiBox" class="emojibox hidden">${EMOJIS.map(e=>`<button type="button" onclick="insertAtCursor('${e}')">${e}</button>`).join('')}</div>
+    <textarea id="nText" style="width:100%;min-height:90px" placeholder="Ej. Mantenimiento del **SBC** a las 23:00. Habrá corte de llamadas 🔧">${esc(n.text||'')}</textarea>
+    <p class="muted" style="font-size:11px;margin:2px 0 10px">Tip: escribe **texto** para ponerlo en negritas.</p>
+    <div class="nrow3">
+      <label class="f">Fecha del evento (opcional)<input type="date" id="nDate" value="${n.date||''}"></label>
+      <label class="f">Hora inicio<input type="time" id="nTS" value="${n.tStart||''}"></label>
+      <label class="f">Hora fin<input type="time" id="nTE" value="${n.tEnd||''}"></label>
+    </div>
+    <div class="form" style="margin-top:12px">
+      <label class="f">Mostrar desde (opcional)<input type="date" id="nFrom" value="${n.from||''}"></label>
+      <label class="f">Mostrar hasta (opcional)<input type="date" id="nTo" value="${n.to||''}"></label>
+    </div>
+    <p class="muted" style="font-size:12px">Si pones fecha del evento y no pones "hasta", el aviso se oculta solo después de ese día. Se muestra en el Resumen y en el correo semanal.</p>
+    <div id="nPrev"></div>
+    <div class="actions"><button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="saveNotice('${id||''}')">${id?'Guardar':'Publicar aviso'}</button></div>`);
+  ui.nIcon = n.icon||'📣';
+  ['nText','nDate','nTS','nTE'].forEach(k=>document.getElementById(k).addEventListener('input', noticePrev));
+  noticePrev();
 }
-function saveNotice(){ const text=val('nText').trim(); if(!text) return toast('Escribe el aviso'); const n={id:uid(), text, createdAt:todayS()}; if(val('nFrom')) n.from=val('nFrom'); if(val('nTo')) n.to=val('nTo'); S.notices=(S.notices||[]).concat([n]); save(); closeModal(); render(); toast('Aviso publicado'); }
+function pickIcon(btn, ic){ ui.nIcon=ic; document.querySelectorAll('#modal .ico').forEach(b=>b.classList.toggle('on', b===btn)); noticePrev(); }
+function insertAtCursor(txt){ const ta=document.getElementById('nText'); const a=ta.selectionStart??ta.value.length, b=ta.selectionEnd??a; ta.value=ta.value.slice(0,a)+txt+ta.value.slice(b); ta.focus(); ta.selectionStart=ta.selectionEnd=a+txt.length; noticePrev(); }
+function wrapBold(){ const ta=document.getElementById('nText'); const a=ta.selectionStart, b=ta.selectionEnd; const sel=ta.value.slice(a,b)||'texto'; ta.value=ta.value.slice(0,a)+'**'+sel+'**'+ta.value.slice(b); ta.focus(); ta.selectionStart=a+2; ta.selectionEnd=a+2+sel.length; noticePrev(); }
+function readNotice(){ const n={icon:ui.nIcon||'📣', text:val('nText').trim()}; ['date','tStart','tEnd','from','to'].forEach((k,i)=>{ const v=val(['nDate','nTS','nTE','nFrom','nTo'][i]); if(v) n[k]=v; }); return n; }
+function noticePrev(){ const el=document.getElementById('nPrev'); if(!el) return; const n=readNotice(); el.innerHTML = n.text ? `<div class="panel notices" style="margin:0"><div class="muted" style="font-size:11px;margin-bottom:4px">Vista previa</div>${noticeHTML(n,false)}</div>` : ''; }
+function saveNotice(id){
+  const n=readNotice(); if(!n.text) return toast('Escribe el aviso');
+  if(n.tEnd && !n.tStart) return toast('Indica la hora de inicio');
+  if(id){ const i=(S.notices||[]).findIndex(x=>x.id===id); if(i<0) return; S.notices[i]=Object.assign({id, createdAt:S.notices[i].createdAt||todayS()}, n); }
+  else S.notices=(S.notices||[]).concat([Object.assign({id:uid(), createdAt:todayS()}, n)]);
+  save(); closeModal(); render(); toast(id?'Aviso actualizado':'Aviso publicado');
+}
 function delNotice(id){ if(!confirm('¿Quitar este aviso?')) return; S.notices=(S.notices||[]).filter(n=>n.id!==id); save(); render(); }
 function mailPanel(){
   const M=Object.assign({enabled:true, fromName:'Control de Equipo · Colaboración', replyTo:''}, S.settings.mail||{});
@@ -820,8 +880,7 @@ function dashboard(){
     <div class="kpi"><div class="n">${S.members.length}</div><div class="l">Integrantes</div></div>
     <div class="kpi"><div class="n" style="color:var(--warn)">${pend.length + (isEditor ? reqList().filter(reqNeedsAdmin).length : reqList().filter(r=>(reqMine(r)&&['Pendiente','Esperando compañero','Por aprobar'].includes(r.status))||reqIncoming(r)).length)}</div><div class="l">${isEditor?'Solicitudes pendientes':'Mis solicitudes en trámite'}</div></div>
   </div>
-  ${(()=>{ const h=holidayOn(t); const nx=[...holidaysOfYear(+t.slice(0,4)),...holidaysOfYear(+t.slice(0,4)+1)].find(x=>x.date>t);
-     return h ? `<div class="alert bad" style="font-size:14px">🎉 <b>Hoy es día festivo:</b> ${esc(h.name)}</div>` : (nx?`<div class="alert ok">🎉 Próximo día festivo: <b>${esc(nx.name)}</b> · ${DAYS[dow(pd(nx.date))]} ${nice(nx.date)}</div>`:''); })()}
+  ${holidaysPanel(t)}
   ${noticesPanel(t)}
   <div class="grid2 dtop">
     ${todayShifts(t)}
