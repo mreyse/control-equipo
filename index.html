@@ -883,7 +883,7 @@ function todayShifts(t){
   const keep=ui.calMember; ui.calMember=''; const W=whoOn(t); ui.calMember=keep;
   const H=S.rotation.hours;
   const li = (m, extra) => `<li><span class="dot" style="background:${m.color}"></span>${esc(m.name)}${extra?`<span class="muted" style="font-size:11px;margin-left:5px">${extra}</span>`:''}</li>`;
-  const block = (r, list, label, extraFn) => `<div class="covl"><div class="covt" style="background:${SHIFT_COLORS[r]||'#eef1f6'}">${label||r}${H[r]?` <span style="font-weight:400;opacity:.75">${H[r].start}–${H[r].end}</span>`:''}</div><ul>${list.length?list.map(m=>li(m, extraFn?extraFn(m):'')).join(''):'<li style="color:var(--bad)">Sin cubrir</li>'}</ul></div>`;
+  const block = (r, list, label, extraFn) => `<div class="covl"><div class="covt" style="background:${r==='Oficina'?'#eef1f6':(SHIFT_COLORS[r]||'#eef1f6')}">${label||r}${H[r]?` <span style="font-weight:400;opacity:.75">${H[r].start}–${H[r].end}</span>`:''}</div><ul>${list.length?list.map(m=>li(m, extraFn?extraFn(m):'')).join(''):'<li style="color:var(--bad)">Sin cubrir</li>'}</ul></div>`;
   const covers = COVER.filter(r=>(W[r]||[]).length || (!holidayOn(t) && expectedShift(r,t)));
   const of = W['Oficina']||[], ho = W['Home office']||[], fx = W['Horario fijo']||[];
   const col1 = covers.map(r=>block(r, W[r]||[])).join('') || '<span class="muted">—</span>';
