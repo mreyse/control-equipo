@@ -283,12 +283,14 @@ table.mh .mrole{display:none}
 .spill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px}
 .svac{color:#3b6d11}
 .swarn{display:block;font-size:10.5px;color:#a32d2d}
+.gemo{position:absolute;top:2px;right:4px;font-size:11px;line-height:1}
+.spill.onsite{background:#EEEDFE;color:#3C3489}
 .gdot{position:absolute;top:5px;right:6px;width:7px;height:7px;border-radius:50%;background:#e24b4a}
 .gdot.inl,.ovm.inl{position:static;display:inline-block;vertical-align:1px}
 .ovm{position:absolute;bottom:3px;right:5px;font-size:10px;color:var(--accent)}
 .mhsub{margin:0 0 6px;font-size:13px;color:var(--muted);font-weight:600}
 .mhlegend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12px;color:var(--muted);margin-top:4px;align-items:center}
-@media(max-width:700px){table.mh{min-width:640px}table.mh .rolec,table.mh th:nth-child(2){display:none}table.mh .mrole{display:block;font-size:10.5px;color:var(--muted)}table.mh td.l{position:sticky;left:0;background:#fff;z-index:1}}
+@media(max-width:700px){table.mh{min-width:640px}table.mh .rolec,table.mh th:first-child{display:none}table.mh .mrole{display:block;font-size:10.5px;color:var(--muted)}table.mh td.nm{position:sticky;left:0;background:#fff;z-index:1}}
 @media print{aside,.toolbar,button{display:none!important}main{padding:0}}
 </style>
 </head>
@@ -374,7 +376,7 @@ function hydrate(d){
   x.oncall = toArr(x.oncall); x.vacations = toArr(x.vacations); x.holidays = toArr(x.holidays); x.notices = toArr(x.notices);
   const R = x.rotation;
   R.order = toArr(R.order); R.breaks = toArr(R.breaks); R.overrides = R.overrides || {};
-  R.positions = toArr(R.positions).map(p=>Object.assign({}, p, {days: toArr(p.days)}));
+  R.positions = toArr(R.positions).map(p=>Object.assign({}, p, {days: toArr(p.days), onsite: toArr(p.onsite)}));
   R.hours = Object.assign(blank().rotation.hours, R.hours||{});
   return x;
 }
@@ -513,6 +515,7 @@ function memberDay(mid, s){
   if(sh==='Descanso') return {label:'Descanso', hours:'', h:0, kind:'rest'};
   if(sh==='Festivo') return {label:'Festivo · '+((holidayOn(s)||{}).name||''), hours:'', h:0, kind:'rest'};
   const hh=S.rotation.hours[sh];
+  if(!o && sh==='Oficina' && isOnsite(mid,s)) return {label:'Oficina · 🏢 presencial', hours:hh?`${hh.start} – ${hh.end}`:'', h:shiftHours(sh), kind:'work'};
   return {label:sh, hours:hh?`${hh.start} – ${hh.end}`:'', h:shiftHours(sh), kind: COVER.includes(sh)?'cover':'work'};
 }
 const NOTICE_ICONS = ['📣','🛠️','📅','⚠️','🚨','🎉','ℹ️','☎️','💻','☕'];
@@ -1315,7 +1318,7 @@ function defaultPositions(n){
     {name:'Mañana',  days:['Mañana','Mañana','Mañana','Mañana','Mañana',D,D]},
     {name:'Mutante', days:[D,'Mutante','Mutante','Mutante','Mutante',O,D]},
     {name:'Tarde',   days:[O,O,'Tarde','Tarde','Tarde',D,D]},
-    {name:'Oficina 1', days:['Tarde','Tarde',O,O,O,D,D]},
+    {name:'Oficina 1', days:['Tarde','Tarde',O,O,O,D,D], onsite:[4]},
   ];
   for(let i=2; base.length<n; i++) base.push({name:'Oficina '+i, days:[O,O,O,O,O,D,D]});
   return base.slice(0,n);
@@ -1349,6 +1352,7 @@ function lineup(w){
 function positionOf(mid, s){ return lineup(weekIdx(s)).indexOf(mid); }
 function memberAtPos(p, s){ return lineup(weekIdx(s))[p]; }
 function roleShift(mid, s){ const p=positionOf(mid,s); if(p<0) return 'Descanso'; return S.rotation.positions[p].days[dow(pd(s))] || 'Descanso'; }
+function isOnsite(mid, s){ const p=positionOf(mid,s); if(p<0) return false; const pos=S.rotation.positions[p]; return (pos.onsite||[]).includes(dow(pd(s))) && shiftOf(mid,s)==='Oficina'; }
 function shiftOf(mid, s){ const o=S.rotation.overrides[mid+'|'+s]; return o ? o.shift : (holidayOn(s) ? 'Festivo' : roleShift(mid,s)); }
 function workHours(a,b){ return Math.max(0, hoursBetween(a,b) - MEAL_H); }
 function shiftHours(sh){ const h=S.rotation.hours[sh]; return h ? workHours(h.start,h.end) : 0; }
@@ -1358,13 +1362,13 @@ function shPill(sh){ const c=PILL[sh]; return c ? `<span class="spill" style="ba
 const shortH = (a,b) => { const f=x=>x.endsWith(':00')?x.slice(0,2).replace(/^0/,'0'):x; return `${f(a)}–${f(b)}`; };
 function mhHead(week, first){
   const t=todayS();
-  return `<tr><th class="l">${first}</th><th class="l">Rol</th>${week.map((s,i)=>{ const h=holidayOn(s); const d=pd(s);
+  return `<tr><th class="l">Rol</th><th class="l">${first}</th>${week.map((s,i)=>{ const h=holidayOn(s); const d=pd(s);
     return `<th class="${s===t?'today':''} ${h?'hol':''}"><b>${DAYS[i]} ${d.getDate()}</b>${h?esc(h.name):(s===t?'hoy':MONTHS[d.getMonth()].slice(0,3).toLowerCase())}</th>`; }).join('')}<th>h</th></tr>`;
 }
 function mhCell(mid, s, content, cls, title){
   const gd = S.oncall.find(g=>g.memberId===mid && inRange(s,g.start,g.end));
   const ov = S.rotation.overrides[mid+'|'+s];
-  return `<td class="sc ${s===todayS()?'today':''} ${cls||''}" onclick="cellEdit('${mid}','${s}')" title="${esc(title||'')}${gd?' · Guardia '+esc(gd.team||''):''}">${content}${ov?'<span class="ovm">✎</span>':''}${gd?'<span class="gdot"></span>':''}</td>`;
+  return `<td class="sc ${s===todayS()?'today':''} ${cls||''}" onclick="cellEdit('${mid}','${s}')" title="${esc(title||'')}${gd?' · Guardia '+esc(gd.team||''):''}">${content}${ov?'<span class="ovm">✎</span>':''}${gd?'<span class="gemo">🚨</span>':''}</td>`;
 }
 function schedules(){
   syncRotation();
@@ -1383,9 +1387,10 @@ function schedules(){
       hrs += shiftHours(sh);
       if(sh==='Descanso') return mhCell(mid, s, '—', 'off', 'Descanso');
       if(sh==='Festivo') return mhCell(mid, s, 'Festivo', 'hol', (holidayOn(s)||{}).name);
+      if(!ov && isOnsite(mid,s)) return mhCell(mid, s, '<span class="spill onsite">🏢 Presencial</span>', '', 'Oficina · debe acudir a la oficina');
       return mhCell(mid, s, shPill(sh), '', ov ? 'Cambio manual'+(ov.note?': '+ov.note:'') : 'Según rol '+pos.name);
     }).join('');
-    return `<tr><td class="l"><span class="dot" style="background:${m.color}"></span>${esc(m.name)}<span class="mrole">${esc(pos.name)}</span></td><td class="l rolec">${esc(pos.name)}</td>${cells}<td class="hrs">${hrs.toFixed(1).replace('.0','')}</td></tr>`;
+    return `<tr><td class="l rolec">${esc(pos.name)}</td><td class="l nm"><span class="dot" style="background:${m.color}"></span>${esc(m.name)}<span class="mrole">${esc(pos.name)}</span></td>${cells}<td class="hrs">${hrs.toFixed(1).replace('.0','')}</td></tr>`;
   }).join('');
   const out = R.order.filter(id=>onBreak(id,weekIdx(week[0])));
   const H = R.hours, hh = k => H[k] ? shortH(H[k].start,H[k].end) : '';
@@ -1405,7 +1410,7 @@ function schedules(){
     ${out.length?`<p class="muted" style="margin:12px 0 0;font-size:13px">Fuera de la rotación esta semana: ${out.map(id=>{ const b=R.breaks.find(b=>b.memberId===id&&inRange(week[0],mondayOf(b.start),b.end)); return `<b>${esc(mName(id))}</b>${b?` · ${esc(b.reason||'pausa')} hasta ${nice(b.end)}, regresa como ${esc(R.positions[b.returnPos]?.name||'último rol')}`:''}`; }).join(', ')}</p>`:''}
   </div>
   ${fixedTable(week)}
-  <div class="mhlegend">${['Mañana','Mutante','Tarde'].map(k=>`<span>${shPill(k)} ${hh(k)}</span>`).join('')}<span>Oficina ${hh('Oficina')}</span><span><span class="gdot inl"></span> Guardia</span><span><span class="ovm inl">✎</span> Cambio manual</span><span>Incluye 1:30 h de comida · «h» = horas efectivas</span></div>
+  <div class="mhlegend">${['Mañana','Mutante','Tarde'].map(k=>`<span>${shPill(k)} ${hh(k)}</span>`).join('')}<span>Oficina ${hh('Oficina')}</span><span><span class="spill onsite">🏢 Presencial</span> acudir a la oficina</span><span>🚨 Guardia</span><span><span class="ovm inl">✎</span> Cambio manual</span><span>Incluye 1:30 h de comida · «h» = horas efectivas</span></div>
   <p class="muted" style="font-size:12px;margin-top:6px">Clic en una celda para cambiar ese día (intercambio, home office, descanso…).</p>`:''}`;
 }
 function fixedTable(week){
@@ -1422,7 +1427,7 @@ function fixedTable(week){
       if(m.fixed.days.includes(i)){ hrs+=workHours(m.fixed.start,m.fixed.end); return mhCell(m.id, s, shortH(m.fixed.start,m.fixed.end), 'fixedh', 'Horario fijo'); }
       return mhCell(m.id, s, '—', 'off', 'Descanso');
     }).join('');
-    return `<tr><td class="l"><span class="dot" style="background:${m.color}"></span>${esc(m.name)}<span class="mrole">${esc(m.group||'')}</span></td><td class="l rolec">${esc(m.group||'')}</td>${cells}<td class="hrs">${hrs.toFixed(1).replace('.0','')}</td></tr>`; }).join('');
+    return `<tr><td class="l rolec">${esc(m.group||'')}</td><td class="l nm"><span class="dot" style="background:${m.color}"></span>${esc(m.name)}<span class="mrole">${esc(m.group||'')}</span></td>${cells}<td class="hrs">${hrs.toFixed(1).replace('.0','')}</td></tr>`; }).join('');
   return `<div class="panel mhwrap"><p class="mhsub">Horario fijo</p><table class="mh">${mhHead(week,'Colaborador')}${rows}</table></div>`;
 }
 function cellEdit(mid, s){
@@ -1453,12 +1458,13 @@ function rotForm(keep){
       <p class="muted" style="font-size:12px;margin:18px 0 0">En esa semana, cada ingeniero ocupa el rol de su misma fila. Las semanas siguientes rotan una posición hacia abajo.</p>
     </div>
     <div style="overflow:auto;margin-top:12px"><table class="xl">
-      <tr><th>Rol</th><th>Ingeniero (semana ref.)</th>${DAYS.map(d=>`<th>${d}</th>`).join('')}</tr>
+      <tr><th>Rol</th><th>Ingeniero (semana ref.)</th>${DAYS.map(d=>`<th>${d}</th>`).join('')}<th title="Días en que ese rol debe acudir a la oficina">🏢 Presencial</th></tr>
       ${D.positions.map((p,i)=>`<tr>
         <td><input value="${esc(p.name)}" style="width:95px" onchange="ui.rot.positions[${i}].name=this.value"></td>
         <td style="white-space:nowrap">${esc(mName(D.order[i]))}
           <button class="btn sec sm" ${i===0?'disabled':''} onclick="rotMove(${i},-1)">↑</button><button class="btn sec sm" ${i===D.order.length-1?'disabled':''} onclick="rotMove(${i},1)">↓</button></td>
         ${p.days.map((d,j)=>`<td><select style="padding:3px;font-size:12px" onchange="ui.rot.positions[${i}].days[${j}]=this.value">${SHIFTS.map(x=>`<option ${x===d?'selected':''}>${x}</option>`).join('')}</select></td>`).join('')}
+        <td style="white-space:nowrap">${DAYS.slice(0,6).map((d,j)=>`<label style="font-size:11px;margin-right:3px"><input type="checkbox" ${(p.onsite||[]).includes(j)?'checked':''} onchange="const o=ui.rot.positions[${i}].onsite=(ui.rot.positions[${i}].onsite||[]).filter(x=>x!==${j}); if(this.checked) o.push(${j});">${d[0]}</label>`).join('')}</td>
       </tr>`).join('')}
     </table></div>
     <h3 style="margin-top:16px">Pausas en la rotación (incapacidad, licencia…)</h3>
@@ -1692,6 +1698,7 @@ function resetPass(){
       if(v){ lastRemote = v; applyingRemote=true; S = hydrate(v); rotCache=new Map(); try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} render(); applyingRemote=false; setSync('✓ Sincronizado');
         let ch=false;
         if(isEditor && !S.mig4){ S.rotation.hours = NEW_HOURS(); S.mig4 = true; ch=true; }
+        if(isEditor && !S.mig8){ (S.rotation.positions||[]).forEach(p=>{ if((p.name==='Oficina 1'||p.name==='Oficina 3') && !(p.onsite||[]).length) p.onsite=[4]; }); S.mig8=true; ch=true; }
         if(isEditor && !S.mig7){ if(S.settings.mail && S.settings.mail.fromName==='Control de Equipo · Colaboración') S.settings.mail.fromName='Agenda Colaboración'; S.mig7=true; ch=true; }
         if(isEditor && !S.mig6){ (S.rotation.breaks||[]).forEach(b=>{ if(b.end==='2027-03-21' && b.returnPos===7){ b.end='2027-02-28'; } }); S.mig6 = true; ch=true; }
         if(isEditor && !S.mig5){ const t=S.rotation.positions.find(p=>p.name==='Tarde'); if(t && t.days[1]==='Descanso') t.days[1]='Oficina'; S.mig5 = true; ch=true; }

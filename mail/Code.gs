@@ -88,7 +88,7 @@ function hydrate(d){
   x.oncall = toArr(x.oncall); x.vacations = toArr(x.vacations); x.holidays = toArr(x.holidays); x.notices = toArr(x.notices);
   const R = x.rotation;
   R.order = toArr(R.order); R.breaks = toArr(R.breaks); R.overrides = R.overrides || {};
-  R.positions = toArr(R.positions).map(p=>Object.assign({}, p, {days: toArr(p.days)}));
+  R.positions = toArr(R.positions).map(p=>Object.assign({}, p, {days: toArr(p.days), onsite: toArr(p.onsite)}));
   R.hours = Object.assign(blank().rotation.hours, R.hours||{});
   return x;
 }
@@ -153,6 +153,7 @@ function lineup(w){
 function positionOf(mid, s){ return lineup(weekIdx(s)).indexOf(mid); }
 function memberAtPos(p, s){ return lineup(weekIdx(s))[p]; }
 function roleShift(mid, s){ const p=positionOf(mid,s); if(p<0) return 'Descanso'; return S.rotation.positions[p].days[dow(pd(s))] || 'Descanso'; }
+function isOnsite(mid, s){ const p=positionOf(mid,s); if(p<0) return false; const pos=S.rotation.positions[p]; return (pos.onsite||[]).includes(dow(pd(s))) && shiftOf(mid,s)==='Oficina'; }
 function shiftOf(mid, s){ const o=S.rotation.overrides[mid+'|'+s]; return o ? o.shift : (holidayOn(s) ? 'Festivo' : roleShift(mid,s)); }
 function workHours(a,b){ return Math.max(0, hoursBetween(a,b) - MEAL_H); }
 function shiftHours(sh){ const h=S.rotation.hours[sh]; return h ? workHours(h.start,h.end) : 0; }
@@ -175,6 +176,7 @@ function memberDay(mid, s){
   if(sh==='Descanso') return {label:'Descanso', hours:'', h:0, kind:'rest'};
   if(sh==='Festivo') return {label:'Festivo · '+((holidayOn(s)||{}).name||''), hours:'', h:0, kind:'rest'};
   const hh=S.rotation.hours[sh];
+  if(!o && sh==='Oficina' && isOnsite(mid,s)) return {label:'Oficina · 🏢 presencial', hours:hh?`${hh.start} – ${hh.end}`:'', h:shiftHours(sh), kind:'work'};
   return {label:sh, hours:hh?`${hh.start} – ${hh.end}`:'', h:shiftHours(sh), kind: COVER.includes(sh)?'cover':'work'};
 }
 function fmtNoticeText(t){ return esc(t||'').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>'); }
