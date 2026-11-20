@@ -1,4 +1,4 @@
-# Control de Equipo · Servicios de Colaboración
+# Agenda Colaboración (repo control-equipo) · Servicios de Colaboración
 
 Página web para controlar **horarios rotativos, guardias, vacaciones/ausencias, festivos y solicitudes** del equipo de Servicios de Colaboración. Propietario: el dueño de la cuenta de GitHub `mreyse`.
 

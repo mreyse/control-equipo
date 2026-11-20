@@ -1,5 +1,5 @@
 /**
- * Control de Equipo · Correo semanal
+ * Agenda Colaboración · Correo semanal
  * ARCHIVO GENERADO por tools/build_mail.py — no editar a mano la sección del motor.
  *
  * Se ejecuta en Google Apps Script con la cuenta dedicada de envío.
@@ -28,7 +28,7 @@ function cargar_() {
   rotCache = new Map();
 }
 function hoy_() { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'); }
-function config_() { return Object.assign({ enabled: true, fromName: 'Control de Equipo · Colaboración', replyTo: '' }, (S.settings && S.settings.mail) || {}); }
+function config_() { return Object.assign({ enabled: true, fromName: 'Agenda Colaboración', replyTo: '' }, (S.settings && S.settings.mail) || {}); }
 
 function enviarResumenSemanal() {
   cargar_();

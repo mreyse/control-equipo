@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Control de Equipo · Horarios, Guardias y Vacaciones</title>
+<title>Agenda Colaboración · Turnos, guardias y vacaciones</title>
 <style>
 :root{
   --bg:#f4f6f9;--panel:#fff;--ink:#1d2433;--muted:#6b7385;--line:#e3e7ee;
@@ -267,7 +267,7 @@ body.ro .asbar .btn{display:inline-block!important}
 <body>
 <div class="app">
   <aside>
-    <h1>Control de Equipo<small>Horarios · Guardias · Vacaciones</small></h1>
+    <h1>Agenda Colaboración<small>Turnos, guardias y vacaciones</small></h1>
     <button class="nav active" data-view="dashboard" data-s="Resumen">📊 <span class="t">Resumen</span></button>
     <button class="nav" data-view="schedules" data-s="Horarios">🕘 <span class="t">Horarios</span></button>
     <button class="nav" data-view="vacations" data-s="Ausencias">🌴 <span class="t">Vacaciones / Ausencias</span><span class="badge hidden" id="pendBadge">0</span></button>
@@ -288,7 +288,7 @@ body.ro .asbar .btn{display:inline-block!important}
 </div>
 
 <div id="login" class="show checking"><div class="lcheck">Cargando…</div><form class="lbox" onsubmit="return doLogin(event)">
-  <h2>Control de Equipo</h2><p class="muted" style="margin-top:0">Servicios de Colaboración · inicia sesión</p>
+  <h2>Agenda Colaboración</h2><p class="muted" style="margin-top:0">Servicios de Colaboración · inicia sesión</p>
   <label class="f">Correo<input id="lEmail" type="email" autocomplete="username" required></label>
   <label class="f">Contraseña<input id="lPass" type="password" autocomplete="current-password" required></label>
   <button class="btn" style="width:100%;padding:10px">Entrar</button>
@@ -806,7 +806,7 @@ function saveNotice(id){
 }
 function delNotice(id){ if(!confirm('¿Quitar este aviso?')) return; S.notices=(S.notices||[]).filter(n=>n.id!==id); save(); render(); }
 function mailPanel(){
-  const M=Object.assign({enabled:true, fromName:'Control de Equipo · Colaboración', replyTo:''}, S.settings.mail||{});
+  const M=Object.assign({enabled:true, fromName:'Agenda Colaboración', replyTo:''}, S.settings.mail||{});
   const withMail=S.members.filter(m=>m.email);
   return `<div class="panel"><h3>✉️ Correo semanal (viernes)</h3>
     <p class="muted" style="margin-top:0">Lo envía automáticamente el script de Google desde la cuenta dedicada. Solo lo reciben las personas marcadas.</p>
@@ -820,7 +820,7 @@ function mailPanel(){
     ${S.members.some(m=>!m.email)?`<p class="muted" style="font-size:12px">Sin correo registrado: ${S.members.filter(m=>!m.email).map(m=>esc(m.name)).join(', ')}.</p>`:''}
   </div>`;
 }
-function setMail(k,v){ S.settings.mail=Object.assign({enabled:true, fromName:'Control de Equipo · Colaboración', replyTo:''}, S.settings.mail||{}, {[k]:v}); save(); toast('Guardado'); }
+function setMail(k,v){ S.settings.mail=Object.assign({enabled:true, fromName:'Agenda Colaboración', replyTo:''}, S.settings.mail||{}, {[k]:v}); save(); toast('Guardado'); }
 function setMemberMail(id,v){ const m=member(id); if(m){ m.mail=v; save(); render(); } }
 function previewMail(id){
   const e=buildWeeklyEmail(id, todayS(), requests);
@@ -1636,6 +1636,7 @@ function resetPass(){
       if(v){ lastRemote = v; applyingRemote=true; S = hydrate(v); rotCache=new Map(); try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} render(); applyingRemote=false; setSync('✓ Sincronizado');
         let ch=false;
         if(isEditor && !S.mig4){ S.rotation.hours = NEW_HOURS(); S.mig4 = true; ch=true; }
+        if(isEditor && !S.mig7){ if(S.settings.mail && S.settings.mail.fromName==='Control de Equipo · Colaboración') S.settings.mail.fromName='Agenda Colaboración'; S.mig7=true; ch=true; }
         if(isEditor && !S.mig6){ (S.rotation.breaks||[]).forEach(b=>{ if(b.end==='2027-03-21' && b.returnPos===7){ b.end='2027-02-28'; } }); S.mig6 = true; ch=true; }
         if(isEditor && !S.mig5){ const t=S.rotation.positions.find(p=>p.name==='Tarde'); if(t && t.days[1]==='Descanso') t.days[1]='Oficina'; S.mig5 = true; ch=true; }
         if(ch){ save(); render(); } }
