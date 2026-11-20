@@ -243,6 +243,7 @@ body.ro .asbar .btn{display:inline-block!important}
 @media(max-width:700px){.gweekrow{grid-template-columns:1fr 1fr!important}.gdate{grid-column:1/-1}}
 .tcols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
 .tcols>div{min-width:0}
+.tcols .covt{display:block;border-radius:6px}
 .tcols .tlabel{text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-size:11px;margin-bottom:8px;padding:0}
 @media(max-width:700px){.tcols{grid-template-columns:1fr;gap:10px}}
 .trow{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:10px 0;border-top:1px solid var(--line);align-items:start}
@@ -894,7 +895,7 @@ function todayShifts(t){
     return `<div class="covl"><div class="covt" style="background:#eef1f6">${label}${one?` <span style="font-weight:400;opacity:.75">${one}</span>`:''}</div><ul>${list.map(m=>li(m, one?'':(m.fixed?`${m.fixed.start}–${m.fixed.end}`:''))).join('')}</ul></div>`; };
   const col3 = (fxBlock('Soporte', fx.filter(m=>m.group!=='MM')) + fxBlock('MM', fx.filter(m=>m.group==='MM'))) || '<span class="muted">—</span>';
   return `<div class="panel"><h3>Turnos de hoy</h3>${holidayOn(t)?`<p class="muted">Hoy es día festivo.</p>`:''}
-    <div class="tcols"><div><div class="tlabel">Turnos</div>${col1}</div><div><div class="tlabel">Oficina</div>${col2}</div><div><div class="tlabel">&nbsp;</div>${col3}</div></div></div>`;
+    <div class="tcols"><div>${col1}</div><div>${col2}</div><div>${col3}</div></div></div>`;
 }
 function guardTimeline(t, o){
   o = o || {};
