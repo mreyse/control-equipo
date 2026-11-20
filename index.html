@@ -277,6 +277,7 @@ table.mh .today{background:#f6f9ff}
 table.mh td.off{color:#b5bccb}
 table.mh td.hol{color:#a32d2d}
 table.mh td.fixedh{color:#555d6e}
+.mnrow{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0;border-bottom:1px solid #f0f2f6}.mnrow:last-child{border-bottom:0}
 table.mh td.rolec{color:var(--muted);font-size:12px}
 table.mh td.hrs{color:var(--muted);text-align:right}
 table.mh .mrole{display:none}
@@ -917,8 +918,8 @@ function guardTimeline(t, o){
   }
   return o.bare ? `<div class="gtl">${rows}</div>` : `<div class="panel"><h3>🚨 Próximas guardias</h3><div class="gtl">${rows}</div></div>`;
 }
-function memberNextGuards(mid, t){
-  const m = member(mid); if(!m) return '';
+function nextGuardList(mid, t){
+  const m = member(mid); if(!m) return {mine:[],team:'',cycle:1};
   const mine = S.oncall.filter(g=>g.memberId===mid && g.end>=t).sort((a,b)=>a.start.localeCompare(b.start)).map(g=>({start:g.start,end:g.end,team:g.team||'Colaboración',id:g.id,est:false}));
   const team = mine[0]?.team || (m.group==='MM'?'MM':'Colaboración');
   const cycle = team==='MM' ? Math.max(1,S.members.filter(x=>x.oncall!==false && x.group==='MM').length) : collabRotationWeeks();
@@ -930,6 +931,11 @@ function memberNextGuards(mid, t){
     last={start:fd(a), end:fd(e)};
     if(last.end>=t) mine.push({...last, team, est:true});
   }
+  return {mine, team, cycle};
+}
+function memberNextGuards(mid, t){
+  const m = member(mid); if(!m) return '';
+  const {mine, team, cycle} = nextGuardList(mid, t);
   if(!mine.length) return `<div class="mng"><div class="mngh"><span class="gav" style="background:${m.color}">${esc(m.name.split(' ').map(w=>w[0]).slice(0,2).join(''))}</span><b>${esc(m.name)}</b></div><span class="muted">No tiene guardias asignadas.</span></div>`;
   const wk = d => Math.round((pd(mondayOf(d)) - pd(mondayOf(t)))/(7*864e5));
   const card = g => { const a=pd(g.start), e=pd(g.end), w=wk(g.start), now=g.start<=t&&g.end>=t;
@@ -945,6 +951,27 @@ function memberNextGuards(mid, t){
 function showNextGuards(mid){
   openModal(`${memberNextGuards(mid, todayS())}<div style="text-align:right;margin-top:14px"><button class="btn sec" onclick="closeModal()">Cerrar</button></div>`);
   document.getElementById('modal').style.width='min(760px,94vw)';
+}
+// Tarjeta para solo lectura: semanas para su próxima guardia y para entrar a Mañana / Mutante / Tarde
+function myNextCard(t){
+  const m = myMember();
+  if(!m) return `<div class="kpi"><div class="l" style="margin-bottom:6px">⏳ Lo que sigue para ti</div><span class="muted" style="font-size:13px">Tu usuario no está vinculado a un integrante.</span></div>`;
+  const mon = mondayOf(t);
+  const wk = d => Math.round((pd(mondayOf(d)) - pd(mon))/(7*864e5));
+  const lbl = w => w<=0 ? '<b style="color:var(--accent)">Esta semana</b>' : w===1 ? '<b>Próxima semana</b>' : `<b>${w}</b> semanas`;
+  const row = (icon, name, val) => `<div class="mnrow"><span>${icon} ${name}</span><span>${val}</span></div>`;
+  let html = '';
+  if(m.oncall!==false){ const g = nextGuardList(m.id, t).mine[0];
+    html += row('🚨','Guardia', g ? lbl(wk(g.start))+(g.est?' <span class="muted" title="Estimada con la rotación">*</span>':'') : '<span class="muted">Sin fecha</span>'); }
+  if(S.rotation.order.includes(m.id)){
+    ['Mañana','Mutante','Tarde'].forEach(role=>{
+      let found = -1;
+      for(let w=0; w<60; w++){ const d=pd(mon); d.setDate(d.getDate()+w*7); const p=positionOf(m.id, fd(d)); if(p>=0 && S.rotation.positions[p]?.name===role){ found=w; break; } }
+      html += row('', shPill(role), found>=0 ? lbl(found) : '<span class="muted">—</span>');
+    });
+  }
+  if(!html) html = '<span class="muted" style="font-size:13px">Sin guardias ni turnos rotativos.</span>';
+  return `<div class="kpi"><div class="l" style="margin-bottom:6px">⏳ Lo que sigue para ti</div>${html}</div>`;
 }
 function collabRotationWeeks(){ return Math.max(1, S.members.filter(m=>m.oncall!==false && m.group==='Colaboración').length); }
 function dashboard(){
@@ -965,7 +992,7 @@ function dashboard(){
   <div class="grid4">
     <div class="kpi"><div class="l" style="margin-bottom:6px">🚨 De guardia hoy</div>${['Colaboración','MM'].map(team=>{ const g=gdToday.find(x=>(x.team||'Colaboración')===team); return `<div class="gtoday"><div><span class="dot" style="background:${g?mColor(g.memberId):'#ccc'}"></span><b>${g?esc(mName(g.memberId)):'<span class="muted">Sin asignar</span>'}</b> <span class="muted" style="font-size:12px">${team}</span></div>${phoneLink(team)}</div>`; }).join('')}</div>
     <div class="kpi"><div class="n">${offToday.length}</div><div class="l">Ausentes hoy</div>${offToday.length?`<div style="margin-top:6px;font-size:13px">${offToday.map(v=>`<div><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))} <span class="muted" style="font-size:11px">(${esc(v.type)}${v.end>t?` · hasta ${nice(v.end)}`:''})</span></div>`).join('')}</div>`:''}</div>
-    <div class="kpi"><div class="n">${S.members.length}</div><div class="l">Integrantes</div></div>
+    ${isEditor?`<div class="kpi"><div class="n">${S.members.length}</div><div class="l">Integrantes</div></div>`:myNextCard(t)}
     <div class="kpi"><div class="n" style="color:var(--warn)">${pend.length + (isEditor ? reqList().filter(reqNeedsAdmin).length : reqList().filter(r=>(reqMine(r)&&['Pendiente','Esperando compañero','Por aprobar'].includes(r.status))||reqIncoming(r)).length)}</div><div class="l">${isEditor?'Solicitudes pendientes':'Mis solicitudes en trámite'}</div></div>
   </div>
   ${holidaysPanel(t)}
