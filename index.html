@@ -1359,6 +1359,11 @@ function shiftHours(sh){ const h=S.rotation.hours[sh]; return h ? workHours(h.st
 
 const PILL = { 'Mañana':['#FAECE7','#712B13'], 'Mutante':['#EAF3DE','#27500A'], 'Tarde':['#FAEEDA','#633806'], 'Home office':['#FBEAF0','#72243E'] };
 function shPill(sh){ const c=PILL[sh]; return c ? `<span class="spill" style="background:${c[0]};color:${c[1]}">${esc(sh)}</span>` : esc(sh); }
+// Etiqueta para horario fijo: «Oficina» (09–19) u «Oficina MM» (08:30–18:30); otro horario se muestra tal cual
+function fixedLabel(m){ const h=m.fixed.start+'-'+m.fixed.end;
+  if(m.group==='MM' && h==='08:30-18:30') return 'Oficina MM';
+  if(m.group!=='MM' && h==='09:00-19:00') return 'Oficina';
+  return shortH(m.fixed.start,m.fixed.end); }
 const shortH = (a,b) => { const f=x=>x.endsWith(':00')?x.slice(0,2).replace(/^0/,'0'):x; return `${f(a)}–${f(b)}`; };
 function mhHead(week, first){
   const t=todayS();
@@ -1410,7 +1415,7 @@ function schedules(){
     ${out.length?`<p class="muted" style="margin:12px 0 0;font-size:13px">Fuera de la rotación esta semana: ${out.map(id=>{ const b=R.breaks.find(b=>b.memberId===id&&inRange(week[0],mondayOf(b.start),b.end)); return `<b>${esc(mName(id))}</b>${b?` · ${esc(b.reason||'pausa')} hasta ${nice(b.end)}, regresa como ${esc(R.positions[b.returnPos]?.name||'último rol')}`:''}`; }).join(', ')}</p>`:''}
   </div>
   ${fixedTable(week)}
-  <div class="mhlegend">${['Mañana','Mutante','Tarde'].map(k=>`<span>${shPill(k)} ${hh(k)}</span>`).join('')}<span>Oficina ${hh('Oficina')}</span><span><span class="spill onsite">🏢 Presencial</span> acudir a la oficina</span><span>🚨 Guardia</span><span><span class="ovm inl">✎</span> Cambio manual</span><span>Incluye 1:30 h de comida · «h» = horas efectivas</span></div>
+  <div class="mhlegend">${['Mañana','Mutante','Tarde'].map(k=>`<span>${shPill(k)} ${hh(k)}</span>`).join('')}<span>Oficina ${hh('Oficina')}</span>${S.members.some(m=>m.group==='MM'&&m.fixed)?'<span>Oficina MM 08:30–18:30</span>':''}<span><span class="spill onsite">🏢 Presencial</span> acudir a la oficina</span><span>🚨 Guardia</span><span><span class="ovm inl">✎</span> Cambio manual</span><span>Incluye 1:30 h de comida · «h» = horas efectivas</span></div>
   <p class="muted" style="font-size:12px;margin-top:6px">Clic en una celda para cambiar ese día (intercambio, home office, descanso…).</p>`:''}`;
 }
 function fixedTable(week){
@@ -1424,7 +1429,7 @@ function fixedTable(week){
       if(vac) return mhCell(m.id, s, `<span class="svac">${esc(vac.type)}</span>`, '', vac.type);
       if(ov){ hrs+=shiftHours(ov.shift); return mhCell(m.id, s, ov.shift==='Descanso'?'—':shPill(ov.shift), ov.shift==='Descanso'?'off':'', 'Cambio manual'+(ov.note?': '+ov.note:'')); }
       if(holidayOn(s)) return mhCell(m.id, s, 'Festivo', 'hol', holidayOn(s).name);
-      if(m.fixed.days.includes(i)){ hrs+=workHours(m.fixed.start,m.fixed.end); return mhCell(m.id, s, shortH(m.fixed.start,m.fixed.end), 'fixedh', 'Horario fijo'); }
+      if(m.fixed.days.includes(i)){ hrs+=workHours(m.fixed.start,m.fixed.end); return mhCell(m.id, s, fixedLabel(m), 'fixedh', 'Horario fijo '+shortH(m.fixed.start,m.fixed.end)); }
       return mhCell(m.id, s, '—', 'off', 'Descanso');
     }).join('');
     return `<tr><td class="l rolec">${esc(m.group||'')}</td><td class="l nm"><span class="dot" style="background:${m.color}"></span>${esc(m.name)}<span class="mrole">${esc(m.group||'')}</span></td>${cells}<td class="hrs">${hrs.toFixed(1).replace('.0','')}</td></tr>`; };
