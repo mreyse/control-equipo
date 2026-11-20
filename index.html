@@ -882,12 +882,17 @@ function todayShifts(t){
   const keep=ui.calMember; ui.calMember=''; const W=whoOn(t); ui.calMember=keep;
   const H=S.rotation.hours;
   const li = (m, extra) => `<li><span class="dot" style="background:${m.color}"></span>${esc(m.name)}${extra?`<span class="muted" style="font-size:11px;margin-left:5px">${extra}</span>`:''}</li>`;
-  const block = (r, list, label, extraFn) => `<div class="covl"><div class="covt" style="background:${SHIFT_COLORS[r]||'#eef1f6'}">${label||r}${H[r]?` <span style="font-weight:400;opacity:.75">${H[r].start}–${H[r].end}</span>`:''} <span class="covn">${list.length}</span></div><ul>${list.length?list.map(m=>li(m, extraFn?extraFn(m):'')).join(''):'<li style="color:var(--bad)">Sin cubrir</li>'}</ul></div>`;
+  const block = (r, list, label, extraFn) => `<div class="covl"><div class="covt" style="background:${SHIFT_COLORS[r]||'#eef1f6'}">${label||r}${H[r]?` <span style="font-weight:400;opacity:.75">${H[r].start}–${H[r].end}</span>`:''}</div><ul>${list.length?list.map(m=>li(m, extraFn?extraFn(m):'')).join(''):'<li style="color:var(--bad)">Sin cubrir</li>'}</ul></div>`;
   const covers = COVER.filter(r=>(W[r]||[]).length || (!holidayOn(t) && expectedShift(r,t)));
   const of = W['Oficina']||[], ho = W['Home office']||[], fx = W['Horario fijo']||[];
   const col1 = covers.map(r=>block(r, W[r]||[])).join('') || '<span class="muted">—</span>';
   const col2 = (of.length?block('Oficina',of):'') + (ho.length?block('Home office',ho):'') || '<span class="muted">—</span>';
-  const col3 = fx.length ? block('Horario fijo', fx, null, m=>m.fixed?`${m.fixed.start}–${m.fixed.end}`:'') : '<span class="muted">—</span>';
+  // Horario fijo separado en Soporte y MM; si todos comparten horario, se muestra en el encabezado
+  const fxBlock = (label, list) => { if(!list.length) return '';
+    const hs = [...new Set(list.map(m=>m.fixed?`${m.fixed.start}–${m.fixed.end}`:''))];
+    const one = hs.length===1 && hs[0];
+    return `<div class="covl"><div class="covt" style="background:#eef1f6">${label}${one?` <span style="font-weight:400;opacity:.75">${one}</span>`:''}</div><ul>${list.map(m=>li(m, one?'':(m.fixed?`${m.fixed.start}–${m.fixed.end}`:''))).join('')}</ul></div>`; };
+  const col3 = (fxBlock('Soporte', fx.filter(m=>m.group!=='MM')) + fxBlock('MM', fx.filter(m=>m.group==='MM'))) || '<span class="muted">—</span>';
   return `<div class="panel"><h3>Turnos de hoy</h3>${holidayOn(t)?`<p class="muted">Hoy es día festivo.</p>`:''}
     <div class="tcols"><div><div class="tlabel">Turnos</div>${col1}</div><div><div class="tlabel">Oficina</div>${col2}</div><div><div class="tlabel">Horario fijo</div>${col3}</div></div></div>`;
 }
