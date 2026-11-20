@@ -210,6 +210,11 @@ body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
 .gphones{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap}
 .gphonebox{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-left:4px solid #d64545;border-radius:10px;padding:10px 14px;flex:1;min-width:240px}
 .gphonebox .gphone{margin-left:auto;font-size:15px}
+.notices{border-left:4px solid #2f6fed}
+.notice{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.notice:first-of-type{border-top:0}
+.mailgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:6px}
+.mailp{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px}
 .gslot{display:flex;align-items:center;gap:9px;min-width:0}
 .gav{width:34px;height:34px;border-radius:50%;color:#fff;font-weight:700;font-size:12px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.15)}
 .gname{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -309,7 +314,7 @@ const NEW_HOURS = () => ({ 'Mañana':{start:'08:00',end:'18:00'}, 'Mutante':{sta
 const GUARD_PHONES_DEFAULT = { 'Colaboración':'8122823041', 'MM':'8131420542' };
 const MEAL_H = 1.5; // 1:30 h de comida por jornada
 function blank(){
-  return { members:[], oncall:[], vacations:[], holidays:[], settings:{ maxOff:2, defaultDays:18 },
+  return { members:[], oncall:[], vacations:[], holidays:[], notices:[], settings:{ maxOff:2, defaultDays:18 },
     rotation:{ anchor:'2026-11-09', order:[], positions:[], overrides:{}, breaks:[],
       hours:{ 'Mañana':{start:'08:00',end:'18:00'}, 'Mutante':{start:'10:00',end:'20:00'}, 'Tarde':{start:'14:00',end:'22:30'}, 'Oficina':{start:'09:00',end:'19:00'}, 'Home office':{start:'09:00',end:'19:00'} } } };
 }
@@ -319,7 +324,7 @@ function hydrate(d){
   const b = blank();
   const x = Object.assign(b, d, {settings:Object.assign(b.settings, d.settings||{}), rotation:Object.assign(blank().rotation, d.rotation||{})});
   x.members = toArr(x.members).map(m=>Object.assign({}, m, {fixed: m.fixed ? Object.assign({}, m.fixed, {days: toArr(m.fixed.days)}) : null}));
-  x.oncall = toArr(x.oncall); x.vacations = toArr(x.vacations); x.holidays = toArr(x.holidays);
+  x.oncall = toArr(x.oncall); x.vacations = toArr(x.vacations); x.holidays = toArr(x.holidays); x.notices = toArr(x.notices);
   const R = x.rotation;
   R.order = toArr(R.order); R.breaks = toArr(R.breaks); R.overrides = R.overrides || {};
   R.positions = toArr(R.positions).map(p=>Object.assign({}, p, {days: toArr(p.days)}));
@@ -435,7 +440,7 @@ function gdConflicts(g){
 /* ================== UI helpers ================== */
 function toast(t){ const el = document.getElementById('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2600); }
 function openModal(html){ document.getElementById('modal').innerHTML = html; document.getElementById('modalBg').classList.add('show'); }
-function closeModal(){ document.getElementById('modalBg').classList.remove('show'); }
+function closeModal(){ document.getElementById('modalBg').classList.remove('show'); document.getElementById('modal').style.width=''; }
 document.getElementById('modalBg').addEventListener('click', e=>{ if(e.target.id==='modalBg') closeModal(); });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
 const memberOptions = (sel, withAll) => (withAll?`<option value="">Todo el equipo</option>`:'') + S.members.map(m=>`<option value="${m.id}" ${m.id===sel?'selected':''}>${esc(m.name)}</option>`).join('');
@@ -444,6 +449,70 @@ function needTeam(){ return S.members.length ? '' : `<div class="panel empty">Pr
 
 document.querySelectorAll('.nav').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)));
 function go(v){ ui.view=v; document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active', b.dataset.view===v)); render(); }
+/* ================== Correo semanal (compartido con mail/Code.gs) ================== */
+function nextMonday(today){ const d=pd(today); d.setDate(d.getDate()+(7-dow(d))); return fd(d); }
+function memberDay(mid, s){
+  const m=member(mid); if(!m) return {label:'', hours:'', h:0};
+  const vac=S.vacations.find(v=>v.memberId===mid && v.status==='Aprobada' && !isHX(v) && inRange(s,v.start,v.end));
+  if(vac) return {label:vac.type, hours:'', h:0, kind:'off'};
+  const o=S.rotation.overrides[mid+'|'+s];
+  let sh = o ? o.shift : null;
+  if(!sh){
+    if(S.rotation.order.includes(mid)) sh = shiftOf(mid,s);
+    else if(holidayOn(s)) sh='Festivo';
+    else if(m.fixed && m.fixed.days.includes(dow(pd(s)))) return {label:'Horario fijo', hours:`${m.fixed.start} – ${m.fixed.end}`, h:workHours(m.fixed.start,m.fixed.end), kind:'work'};
+    else sh='Descanso';
+  }
+  if(sh==='Descanso') return {label:'Descanso', hours:'', h:0, kind:'rest'};
+  if(sh==='Festivo') return {label:'Festivo · '+((holidayOn(s)||{}).name||''), hours:'', h:0, kind:'rest'};
+  const hh=S.rotation.hours[sh];
+  return {label:sh, hours:hh?`${hh.start} – ${hh.end}`:'', h:shiftHours(sh), kind: COVER.includes(sh)?'cover':'work'};
+}
+function activeNotices(a, b){ return (S.notices||[]).filter(n=>(!n.from||n.from<=b) && (!n.to||n.to>=a)); }
+function buildWeeklyEmail(mid, today, reqs){
+  const m=member(mid); const ws=nextMonday(today); const we=fd(new Date(pd(ws).getTime()+6*864e5));
+  const days=[...Array(7)].map((_,i)=>fd(new Date(pd(ws).getFullYear(),pd(ws).getMonth(),pd(ws).getDate()+i)));
+  const first=(m.name||'').split(' ')[0];
+  const C={ink:'#1d2433',mut:'#6b7385',line:'#e3e7ee',red:'#b42318',redbg:'#fde8e8',warn:'#8a5a00',warnbg:'#fff4dc',blue:'#1f4fb8',bluebg:'#e8f0fe',ok:'#17663a'};
+  const myGuardWeek=S.oncall.find(g=>g.memberId===mid && overlaps(g.start,g.end,ws,we));
+  const rowsD=days.map((s,i)=>{ const d=memberDay(mid,s); const dt=pd(s);
+    const tag = d.kind==='cover' ? `<span style="background:${SHIFT_COLORS[d.label]||'#eee'};padding:1px 8px;border-radius:6px">${esc(d.label)}</span>` : esc(d.label);
+    return `<tr style="color:${d.kind==='rest'||d.kind==='off'?C.mut:C.ink}"><td style="padding:6px 0;border-bottom:1px solid ${C.line}">${DAYS[i]} ${dt.getDate()}</td><td style="padding:6px 0;border-bottom:1px solid ${C.line}">${tag}</td><td style="padding:6px 0;border-bottom:1px solid ${C.line};text-align:right">${esc(d.hours)}</td></tr>`; }).join('');
+  const totalH = days.reduce((t,s)=>t+memberDay(mid,s).h,0);
+  const pos = S.rotation.order.includes(mid) ? positionOf(mid,ws) : -1;
+  const roleName = pos>=0 ? S.rotation.positions[pos].name : (m.fixed?'Horario fijo':'');
+  const nextG = S.oncall.filter(g=>g.memberId===mid && g.end>=today).sort((a,b)=>a.start.localeCompare(b.start)).slice(0,3);
+  const wk = s => Math.round((pd(mondayOf(s))-pd(ws))/(7*864e5));
+  const R = Object.entries(reqs||{}).map(([id,r])=>Object.assign({id},r)).filter(r=>r.memberId===mid && ['Pendiente','Esperando compañero','Por aprobar'].includes(r.status));
+  const inc = Object.entries(reqs||{}).map(([id,r])=>Object.assign({id},r)).filter(r=>r.targetMemberId===mid && r.status==='Esperando compañero');
+  const yr=ws.slice(0,4), tot=m.vacDays??S.settings.defaultDays, used=usedDays(mid,yr);
+  const lu = lineup(weekIdx(ws));
+  const coverTxt = ['Mañana','Mutante','Tarde'].map(r=>{ const i=S.rotation.positions.findIndex(p=>p.name===r); return i>=0&&lu[i]?`${r}: ${esc(mName(lu[i]).split(' ')[0])}`:''; }).filter(Boolean).join(' · ');
+  const gTeam = ['Colaboración','MM'].map(t=>{ const g=S.oncall.find(x=>(x.team||'Colaboración')===t && overlaps(x.start,x.end,ws,we)); return `Guardia ${t}: ${g?esc(mName(g.memberId)):'sin asignar'} · ${esc(fmtPhone(guardPhone(t)))}`; }).join('<br>');
+  const aus = S.vacations.filter(v=>v.status==='Aprobada' && !isHX(v) && overlaps(v.start,v.end,ws,we)).map(v=>`${esc(mName(v.memberId))} (hasta ${nice(v.end)})`);
+  const hols = days.map(s=>holidayOn(s)).filter(Boolean);
+  const nots = activeNotices(ws,we);
+  const sec = (t, body) => `<p style="margin:18px 0 6px;font-size:15px;font-weight:bold;color:${C.ink}">${t}</p>${body}`;
+  const sameM = pd(ws).getMonth()===pd(we).getMonth();
+  const subject = `Tu semana del ${pd(ws).getDate()}${sameM?'':' de '+MONTHS[pd(ws).getMonth()].toLowerCase()} al ${pd(we).getDate()} de ${MONTHS[pd(we).getMonth()].toLowerCase()}${roleName?' · '+roleName:''}${myGuardWeek?' + Guardia':''}`;
+  const html = `<div style="font-family:Segoe UI,Arial,sans-serif;background:#f4f6f9;padding:20px"><div style="max-width:620px;margin:0 auto;background:#fff;border:1px solid ${C.line};border-radius:12px;padding:22px;color:${C.ink};font-size:14px;line-height:1.55">
+    <p style="margin:0;font-size:20px;font-weight:bold">Hola, ${esc(first)}</p>
+    <p style="margin:4px 0 0;color:${C.mut}">Tu resumen para la semana del lunes ${nice(ws)} al domingo ${nice(we)}.</p>
+    ${myGuardWeek?`<div style="margin-top:16px;background:${C.redbg};border:1px solid #f3b4b4;border-radius:8px;padding:10px 14px;color:${C.red}"><b>🚨 Tienes guardia esta semana</b><br>${esc(myGuardWeek.team||'Colaboración')} · ${nice(myGuardWeek.start)} al ${nice(myGuardWeek.end)} · Teléfono de guardia ${esc(fmtPhone(guardPhone(myGuardWeek.team||'Colaboración')))}</div>`:''}
+    ${inc.length?`<div style="margin-top:12px;background:${C.warnbg};border-radius:8px;padding:10px 14px;color:${C.warn}"><b>🔄 Tienes ${inc.length} solicitud(es) de intercambio esperando tu respuesta.</b> Entra a la página para aceptar o rechazar.</div>`:''}
+    ${hols.length?`<div style="margin-top:12px;background:#fde2e2;border-radius:8px;padding:10px 14px;color:${C.red}">🎉 Día festivo: ${hols.map(h=>`${esc(h.name)} (${nice(h.date)})`).join(', ')}</div>`:''}
+    ${sec(`Tu horario${roleName?' · '+esc(roleName):''}`, `<table style="width:100%;border-collapse:collapse;font-size:13px">${rowsD}</table><p style="margin:6px 0 0;font-size:12px;color:${C.mut}">Incluye 1:30 h de comida por jornada · ${String(Math.round(totalH*10)/10).replace('.',',')} h efectivas en la semana.</p>`)}
+    ${m.oncall!==false?sec('Tus próximas guardias', nextG.length?`<p style="margin:0;font-size:13px;color:${C.mut}">${nextG.map(g=>{ const w=wk(g.start); return `${nice(g.start)} – ${nice(g.end)} (${w<=0?'esta semana':w===1?'la siguiente':'en '+w+' semanas'})`; }).join('<br>')}</p>`:`<p style="margin:0;font-size:13px;color:${C.mut}">No tienes guardias próximas registradas.</p>`):''}
+    ${sec('Tus solicitudes y vacaciones', `<p style="margin:0;font-size:13px;color:${C.mut}">${R.map(r=>`${r.kind==='vac'?esc(r.type)+' '+nice(r.start)+(r.end&&r.end!==r.start?' – '+nice(r.end):''):(r.kind==='swap'?'Intercambio de turno':'Intercambio de guardia')} · <span style="color:${C.warn}">${esc(r.status)}</span>`).join('<br>')}${R.length?'<br>':''}Saldo ${yr}: ${tot-used} de ${tot} días hábiles disponibles.</p>`)}
+    <div style="border-top:1px solid ${C.line};margin-top:18px">
+    ${sec('Del equipo la próxima semana', `<p style="margin:0;font-size:13px;color:${C.mut}">${coverTxt?coverTxt+'<br>':''}${gTeam}${aus.length?'<br>Ausentes: '+aus.join(', '):''}</p>`)}
+    ${nots.length?`<div style="margin-top:12px;background:${C.bluebg};border-radius:8px;padding:10px 14px;color:${C.blue}"><b>📣 Avisos</b><br>${nots.map(n=>esc(n.text)).join('<br>')}</div>`:''}
+    </div>
+    <p style="margin:20px 0 0;font-size:12px;color:${C.mut}">Consulta todo en <a href="https://mreyse.github.io/control-equipo/" style="color:${C.blue}">mreyse.github.io/control-equipo</a>. Este correo se envía automáticamente cada viernes.</p>
+  </div></div>`;
+  return {subject, html};
+}
+
 /* ================== Solicitudes de usuarios (vacaciones e intercambios) ================== */
 let requests = {}, reqRef = null;
 const reqList = () => Object.entries(requests||{}).map(([id,r])=>Object.assign({id}, r));
@@ -625,6 +694,45 @@ function render(){ const f = {dashboard,calendar,vacations,oncall,schedules,team
 }
 
 /* ================== Vista: Resumen ================== */
+function noticesPanel(t){
+  const act = activeNotices(t, t).concat((S.notices||[]).filter(n=>n.from && n.from>t)).filter((n,i,a)=>a.indexOf(n)===i);
+  if(!act.length && !isEditor) return '';
+  return `<div class="panel notices"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 style="margin:0">📣 Avisos</h3>${isEditor?'<button class="btn sec sm" onclick="noticeForm()">+ Aviso</button>':''}</div>
+    ${act.length?act.map(n=>`<div class="notice"><div>${esc(n.text)}${n.from||n.to?`<div class="muted" style="font-size:11px">${n.from?'Desde '+nice(n.from):''}${n.from&&n.to?' · ':''}${n.to?'Hasta '+nice(n.to):''}</div>`:''}</div>${isEditor?`<button class="btn sec sm" onclick="delNotice('${n.id}')" title="Quitar aviso">✕</button>`:''}</div>`).join(''):'<p class="muted" style="margin:8px 0 0">No hay avisos. Lo que escribas aquí también aparece en el correo semanal.</p>'}</div>`;
+}
+function noticeForm(){
+  openModal(`<h3>Nuevo aviso</h3><div class="form">
+    <label class="f full">Aviso<textarea id="nText" placeholder="Mantenimiento del SBC el jueves a las 23:00"></textarea></label>
+    <label class="f">Mostrar desde (opcional)<input type="date" id="nFrom"></label>
+    <label class="f">Hasta (opcional)<input type="date" id="nTo"></label></div>
+    <p class="muted" style="font-size:12px">Se muestra en el Resumen y en el correo semanal mientras esté vigente.</p>
+    <div class="actions"><button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="saveNotice()">Publicar aviso</button></div>`);
+}
+function saveNotice(){ const text=val('nText').trim(); if(!text) return toast('Escribe el aviso'); const n={id:uid(), text, createdAt:todayS()}; if(val('nFrom')) n.from=val('nFrom'); if(val('nTo')) n.to=val('nTo'); S.notices=(S.notices||[]).concat([n]); save(); closeModal(); render(); toast('Aviso publicado'); }
+function delNotice(id){ if(!confirm('¿Quitar este aviso?')) return; S.notices=(S.notices||[]).filter(n=>n.id!==id); save(); render(); }
+function mailPanel(){
+  const M=Object.assign({enabled:true, fromName:'Control de Equipo · Colaboración', replyTo:''}, S.settings.mail||{});
+  const withMail=S.members.filter(m=>m.email);
+  return `<div class="panel"><h3>✉️ Correo semanal (viernes)</h3>
+    <p class="muted" style="margin-top:0">Lo envía automáticamente el script de Google desde la cuenta dedicada. Solo lo reciben las personas marcadas.</p>
+    <div class="form" style="max-width:700px">
+      <label class="f" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" ${M.enabled?'checked':''} onchange="setMail('enabled',this.checked)"> Envío semanal activo</label><span></span>
+      <label class="f">Nombre del remitente<input value="${esc(M.fromName)}" onchange="setMail('fromName',this.value.trim())"></label>
+      <label class="f">Responder a (opcional)<input type="email" value="${esc(M.replyTo)}" placeholder="tu.correo@empresa.com" onchange="setMail('replyTo',this.value.trim())"></label>
+    </div>
+    <p style="margin:14px 0 6px;font-weight:600;font-size:13px">Destinatarios (${withMail.filter(m=>m.mail).length} de ${withMail.length})</p>
+    <div class="mailgrid">${withMail.map(m=>`<label class="mailp"><input type="checkbox" ${m.mail?'checked':''} onchange="setMemberMail('${m.id}',this.checked)"><span class="dot" style="background:${m.color}"></span>${esc(m.name)}<button class="btn sec sm" style="margin-left:auto" onclick="event.preventDefault();previewMail('${m.id}')">Vista previa</button></label>`).join('')}</div>
+    ${S.members.some(m=>!m.email)?`<p class="muted" style="font-size:12px">Sin correo registrado: ${S.members.filter(m=>!m.email).map(m=>esc(m.name)).join(', ')}.</p>`:''}
+  </div>`;
+}
+function setMail(k,v){ S.settings.mail=Object.assign({enabled:true, fromName:'Control de Equipo · Colaboración', replyTo:''}, S.settings.mail||{}, {[k]:v}); save(); toast('Guardado'); }
+function setMemberMail(id,v){ const m=member(id); if(m){ m.mail=v; save(); render(); } }
+function previewMail(id){
+  const e=buildWeeklyEmail(id, todayS(), requests);
+  openModal(`<h3 style="margin-bottom:4px">Vista previa · ${esc(mName(id))}</h3><p class="muted" style="margin:0 0 10px;font-size:13px"><b>Asunto:</b> ${esc(e.subject)}</p><iframe id="mailFrame" style="width:100%;height:65vh;border:1px solid var(--line);border-radius:8px;background:#f4f6f9"></iframe><div class="actions"><button class="btn" onclick="closeModal()">Cerrar</button></div>`);
+  document.getElementById('modal').style.width='min(760px,96vw)';
+  document.getElementById('mailFrame').srcdoc = e.html;
+}
 function todayShifts(t){
   const keep=ui.calMember; ui.calMember=''; const W=whoOn(t); ui.calMember=keep;
   const H=S.rotation.hours;
@@ -714,6 +822,7 @@ function dashboard(){
   </div>
   ${(()=>{ const h=holidayOn(t); const nx=[...holidaysOfYear(+t.slice(0,4)),...holidaysOfYear(+t.slice(0,4)+1)].find(x=>x.date>t);
      return h ? `<div class="alert bad" style="font-size:14px">🎉 <b>Hoy es día festivo:</b> ${esc(h.name)}</div>` : (nx?`<div class="alert ok">🎉 Próximo día festivo: <b>${esc(nx.name)}</b> · ${DAYS[dow(pd(nx.date))]} ${nice(nx.date)}</div>`:''); })()}
+  ${noticesPanel(t)}
   <div class="grid2 dtop">
     ${todayShifts(t)}
     ${guardTimeline(t)}
@@ -1255,6 +1364,7 @@ function memberForm(id){
       <label class="f">Color<input type="color" id="mColor" value="${m.color}" style="height:36px;padding:2px"></label>
       <label class="full" style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="mOncall" ${m.oncall!==false?'checked':''}> Participa en rotación de guardias</label>
       <label class="full" style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="mShifts" ${m.shifts!==false?'checked':''}> Participa en la rotación semanal de horarios (Mañana/Mutante/Tarde/Oficina)</label>
+      <label class="full" style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="mMail" ${m.mail?'checked':''}> Recibe el correo semanal de los viernes</label>
       <div class="full"><label class="f">Horario fijo (si no está en la rotación)</label>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">
           <label style="font-size:13px;white-space:nowrap"><input type="checkbox" id="mFixOn" ${m.fixed?'checked':''}> Tiene horario fijo</label>
@@ -1267,7 +1377,7 @@ function memberForm(id){
   setTimeout(()=>document.getElementById('mName').focus(),50);
 }
 function saveMember(id){
-  const d = { name:val('mName').trim(), role:val('mRole').trim(), email:val('mEmail').trim(), phone:val('mPhone').trim(), vacDays:+val('mDays')||0, color:val('mColor'), oncall:document.getElementById('mOncall').checked, shifts:document.getElementById('mShifts').checked, group:val('mGroup'),
+  const d = { name:val('mName').trim(), role:val('mRole').trim(), email:val('mEmail').trim(), phone:val('mPhone').trim(), vacDays:+val('mDays')||0, color:val('mColor'), oncall:document.getElementById('mOncall').checked, shifts:document.getElementById('mShifts').checked, mail:document.getElementById('mMail').checked, group:val('mGroup'),
     fixed: document.getElementById('mFixOn').checked ? {start:val('mFixS'), end:val('mFixE'), days:[...document.querySelectorAll('.mFixD:checked')].map(x=>+x.value)} : null };
   if(!d.name) return toast('Escribe el nombre');
   if(id){ Object.assign(member(id), d); syncRotation(); }
@@ -1316,6 +1426,7 @@ function settings(){
       <button class="btn" onclick="addEditor()">+ Agregar administrador</button>
     </div></div>`:''}
   ${holidayPanel()}
+  ${mailPanel()}
   <div class="panel"><h3>Reglas</h3>
     <div class="form" style="max-width:600px">
       <label class="f">Máximo de personas ausentes el mismo día<input type="number" min="1" value="${S.settings.maxOff}" onchange="S.settings.maxOff=Math.max(1,+this.value);save();toast('Guardado')"></label>

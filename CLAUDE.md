@@ -34,7 +34,9 @@ Ver `database.rules.json`. Resumen: lectura para cualquier autenticado; `/contro
 - `oncall[]` (guardias): `{id,memberId,team('Colaboración'|'MM'),type,start,end,notes}` — semanas lunes a domingo.
 - `vacations[]`: `{id,memberId,type,start,end,tStart?,tEnd?,status,requestedAt,notes,fromRequest?}`
 - `holidays[]`: festivos de empresa `{date,name}` o desactivación de un oficial `{date,off:true}`.
-- `settings`: `{maxOff, defaultDays:18, guardPhones:{Colaboración,MM}}`
+- `settings`: `{maxOff, defaultDays:18, guardPhones:{Colaboración,MM}, mail:{enabled,fromName,replyTo}}`
+- `notices[]` (avisos): `{id,text,from?,to?,createdAt}` — se muestran en Resumen y en el correo semanal.
+- `members[].mail` (bool): recibe el correo semanal (apagado por defecto; el propietario decide a quién).
 - `/requests`: `kind` = `vac` | `swap` (turno) | `gswap` (guardia); estados: `Pendiente`, `Esperando compañero`, `Por aprobar`, `Aprobada`, `Rechazada`, `Cancelada`.
 
 ## Reglas de negocio
@@ -49,6 +51,12 @@ Ver `database.rules.json`. Resumen: lectura para cualquier autenticado; `/contro
 - **Vacaciones:** 18 días hábiles por año; festivos no cuentan. Tipo "Horas extras a cambiar" registra día + horas y no cuenta como ausencia.
 - **Festivos:** LFT art. 74 calculados por año + festivos de empresa en Ajustes. En Horarios se muestran como "🎉 Festivo" salvo cambio manual.
 - **"Sin cubrir"** solo se marca cuando el rol debería existir ese día (`expectedShift`).
+
+## Correo semanal (viernes 16:00, hora de Monterrey)
+- Lo envía **Google Apps Script** desde una **cuenta de Gmail dedicada** (miembro del proyecto de Firebase con rol Visor) que lee Firebase por REST con su token OAuth.
+- Código en `mail/Code.gs` + `mail/appsscript.json`. **`mail/Code.gs` se genera** con `python3 tools/build_mail.py`, que copia de `index.html` el motor de horarios y `buildWeeklyEmail()`. Si cambias algo de horarios, guardias o del correo en `index.html`, **regenera `mail/Code.gs`** y avisa al usuario que debe volver a pegarlo en Apps Script.
+- Solo se envía a integrantes con `mail === true` y correo registrado. Se activa/pausa en Ajustes → Correo semanal (`settings.mail.enabled`). Ajustes tiene vista previa por persona.
+- Funciones de Apps Script: `probar()` (copias a la cuenta del bot), `enviarResumenSemanal()`, `instalarDisparador()`, `quitarDisparador()`.
 
 ## Preferencias de diseño del usuario (ya aplicadas)
 - Calendario: vista predeterminada **Semana** (también Día y Mes). Ausencias y turnos **sin relleno**, solo línea de color a la izquierda. Guardia + vacaciones de la misma persona en **una sola línea** (🚨🌴).
