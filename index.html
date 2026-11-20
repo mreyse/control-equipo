@@ -388,7 +388,7 @@ function pendingDays(mid, year){
 const isHX = v => v.type===HX;
 const hxHours = v => (v.tStart&&v.tEnd) ? hoursBetween(v.tStart,v.tEnd) : 0;
 const fmtH = h => (Math.round(h*100)/100).toString().replace('.',',')+' h';
-function vacDur(v){ return isHX(v) ? fmtH(hxHours(v)) : businessDays(v.start,v.end)+' día(s)'; }
+function vacDur(v){ const n=businessDays(v.start,v.end); return isHX(v) ? fmtH(hxHours(v)) : n+(n===1?' día hábil':' días hábiles'); }
 function vacWhen(v){ return isHX(v) ? `${nice(v.start)} · ${v.tStart||''}–${v.tEnd||''}` : `${nice(v.start)} – ${nice(v.end)}`; }
 function groupFilter(sel, mid){ if(!sel) return true; if(sel.startsWith('g:')) return (member(mid)?.group||'')===sel.slice(2); return mid===sel; }
 function groupMemberOptions(sel){ return `<option value="">Todo el equipo</option><optgroup label="Grupos">${GROUPS.map(g=>`<option value="g:${g}" ${sel==='g:'+g?'selected':''}>${g}</option>`).join('')}</optgroup><optgroup label="Integrantes">${S.members.map(m=>`<option value="${m.id}" ${m.id===sel?'selected':''}>${esc(m.name)}</option>`).join('')}</optgroup>`; }
@@ -902,7 +902,7 @@ function vacations(){
   ${isEditor ? (()=>{ const all=reqList().sort((a,b)=>(reqNeedsAdmin(b)-reqNeedsAdmin(a)) || (b.createdAt||'').localeCompare(a.createdAt||'')).slice(0,30); return all.length?`<div class="panel"><h3>📨 Solicitudes del equipo</h3>${reqRows(all,true)}</div>`:''; })()
              : `<div class="panel"><h3>📨 Mis solicitudes</h3>${myRequestsPanel()}</div>`}
   <div class="panel">${list.length?`<table>
-    <tr><th>Integrante</th><th>Tipo</th><th>Fechas</th><th>Duración</th><th>Estado</th><th>Solicitada</th>${isEditor?'<th>Alertas</th>':''}<th></th></tr>
+    <tr><th>Integrante</th><th>Tipo</th><th>Fechas</th><th title="Lunes a viernes, sin contar días festivos">Duración <span class="muted" style="text-transform:none;font-weight:400">(días hábiles)</span></th><th>Estado</th><th>Solicitada</th>${isEditor?'<th>Alertas</th>':''}<th></th></tr>
     ${list.map(v=>{ const c=['Aprobada','Pendiente'].includes(v.status)?vacConflicts(v):[]; return `<tr>
       <td><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))}</td>
       <td>${esc(v.type)}${v.notes?`<br><span class="muted" style="font-size:12px">${esc(v.notes)}</span>`:''}</td>
