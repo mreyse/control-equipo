@@ -207,6 +207,9 @@ body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
 .gtoday:first-of-type{border-top:0}
 .gphone{display:inline-flex;align-items:center;gap:4px;background:#fde8e8;color:#b42318;font-weight:700;font-size:13px;border-radius:7px;padding:3px 9px;text-decoration:none;white-space:nowrap}
 .gphone:hover{background:#fbd5d5}
+.gtoday .gphone{background:none;color:var(--ink);font-weight:500;padding:2px 0 0 15px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.gtoday .gphone:hover{background:none;color:var(--accent);text-decoration:underline}
+.gtoday .gphone .pic{filter:grayscale(1);opacity:.55;font-size:11px}
 .gphones{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap}
 .gphonebox{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-left:4px solid #d64545;border-radius:10px;padding:10px 14px;flex:1;min-width:240px}
 .gphonebox .gphone{margin-left:auto;font-size:15px}
@@ -1694,7 +1697,7 @@ function doLogin(e){
 }
 function guardPhone(team){ const p=(S.settings.guardPhones||{})[team]; return (p!=null && p!=='') ? p : (GUARD_PHONES_DEFAULT[team]||''); }
 function fmtPhone(p){ const d=String(p).replace(/\D/g,''); return d.length===10 ? `${d.slice(0,2)} ${d.slice(2,6)} ${d.slice(6)}` : p; }
-function phoneLink(team){ const p=guardPhone(team); return p ? `<a class="gphone" href="tel:${esc(String(p).replace(/[^\d+]/g,''))}">📞 ${esc(fmtPhone(p))}</a>` : ''; }
+function phoneLink(team){ const p=guardPhone(team); return p ? `<a class="gphone" href="tel:${esc(String(p).replace(/[^\d+]/g,''))}"><span class="pic">📞</span> ${esc(fmtPhone(p))}</a>` : ''; }
 function myMember(){ if(ui.asMember) return member(ui.asMember) || null;
   return myMemberReal(); }
 function myMemberReal(){ if(!fbUser) return null; const e=(fbUser.email||'').trim().toLowerCase(); return S.members.find(m=>e && (m.email||'').trim().toLowerCase()===e) || null; }
