@@ -277,7 +277,7 @@ table.mh .today{background:#f6f9ff}
 table.mh td.off{color:#b5bccb}
 table.mh td.hol{color:#a32d2d}
 table.mh td.fixedh{color:#555d6e}
-.mnrow{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0;border-bottom:1px solid #f0f2f6}.mnrow:last-child{border-bottom:0}
+.mnrow{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0;border-bottom:1px solid #f0f2f6}.mnrow:last-child{border-bottom:0}.mnrow.mnhead{font-size:11px;color:var(--muted,#8a93a3);padding:0 0 2px}
 table.mh td.rolec{color:var(--muted);font-size:12px}
 table.mh td.hrs{color:var(--muted);text-align:right}
 table.mh .mrole{display:none}
@@ -971,7 +971,7 @@ function myNextCard(t){
     });
   }
   if(!html) html = '<span class="muted" style="font-size:13px">Sin guardias ni turnos rotativos.</span>';
-  return `<div class="kpi"><div class="l" style="margin-bottom:6px">⏳ Lo que sigue para ti</div>${html}</div>`;
+  return `<div class="kpi"><div class="l" style="margin-bottom:6px">⏳ Lo que sigue para ti</div><div class="mnrow mnhead"><span></span><span>Semanas faltantes</span></div>${html}</div>`;
 }
 function collabRotationWeeks(){ return Math.max(1, S.members.filter(m=>m.oncall!==false && m.group==='Colaboración').length); }
 function dashboard(){
