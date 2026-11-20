@@ -217,6 +217,12 @@ body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
 @media(max-width:700px){.nrow3{grid-template-columns:1fr 1fr}.nrow3 label:first-child{grid-column:1/-1}}
 .hols{border-left:4px solid #d64545}
 .hchip{display:inline-block;background:#fde2e2;color:#b42318;border-radius:6px;padding:1px 7px;font-size:12px;margin-left:4px;white-space:nowrap}
+.uvgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.uvcard{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;font:inherit;color:inherit}
+.uvcard:hover{border-color:var(--accent);background:#f7faff}
+.asbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff4dc;border:1px solid #f1d38a;color:#6b4a00;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:14px}
+.asbar select{margin-left:auto;padding:5px 8px}
+body.ro .asbar .btn{display:inline-block!important}
 .icopick{display:flex;flex-wrap:wrap;gap:4px}
 .ico{font-size:18px;background:#fff;border:1px solid var(--line);border-radius:8px;width:38px;height:36px;cursor:pointer}
 .ico.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
@@ -263,11 +269,12 @@ body.ro input[onchange*="S.settings"]{pointer-events:none;opacity:.6}
   <aside>
     <h1>Control de Equipo<small>Horarios · Guardias · Vacaciones</small></h1>
     <button class="nav active" data-view="dashboard" data-s="Resumen">📊 <span class="t">Resumen</span></button>
-    <button class="nav" data-view="calendar" data-s="Calendario">📅 <span class="t">Calendario</span></button>
+    <button class="nav" data-view="schedules" data-s="Horarios">🕘 <span class="t">Horarios</span></button>
     <button class="nav" data-view="vacations" data-s="Ausencias">🌴 <span class="t">Vacaciones / Ausencias</span><span class="badge hidden" id="pendBadge">0</span></button>
     <button class="nav" data-view="oncall" data-s="Guardias">🚨 <span class="t">Guardias</span></button>
-    <button class="nav" data-view="schedules" data-s="Horarios">🕘 <span class="t">Horarios</span></button>
+    <button class="nav" data-view="calendar" data-s="Calendario">📅 <span class="t">Calendario</span></button>
     <button class="nav" data-view="team" data-s="Equipo">👥 <span class="t">Equipo</span></button>
+    <button class="nav edit-only" data-view="userview" data-s="Vista usuario">👁 <span class="t">Vista usuario</span></button>
     <button class="nav" data-view="settings" data-s="Ajustes">⚙️ <span class="t">Ajustes</span></button>
     <div class="spacer"></div>
     <div class="userbox"><div id="whoami"></div><div id="syncState" style="margin-top:4px">—</div><button onclick="doLogout()">Cerrar sesión</button></div>
@@ -566,6 +573,7 @@ function adminRequestsHTML(){ const list=reqList().filter(reqNeedsAdmin).sort((a
 
 /* ---- Formularios ---- */
 function reqVacation(){
+  if(ui.asMember) return toast('Estás en Vista usuario: solo puedes mirar');
   const me=myMember(); if(!me) return toast('Tu usuario no está vinculado a un integrante');
   openModal(`<h3>Solicitar ausencia</h3><p class="muted" style="margin-top:0">${esc(me.name)} · la solicitud llega al administrador para su aprobación.</p>
     <div class="form">
@@ -599,6 +607,7 @@ function sendVacReq(){
   firebase.database().ref('requests').push(r).then(()=>{ closeModal(); toast('Solicitud enviada'); }).catch(e=>toast('No se pudo enviar: '+e.message));
 }
 function reqSwap(){
+  if(ui.asMember) return toast('Estás en Vista usuario: solo puedes mirar');
   const me=myMember(); if(!me) return toast('Tu usuario no está vinculado a un integrante');
   if(!S.rotation.order.includes(me.id)) return toast('Los intercambios son para quienes están en la rotación de turnos');
   const mates = S.members.filter(m=>m.id!==me.id && S.rotation.order.includes(m.id));
@@ -630,6 +639,7 @@ function sendSwap(){
 function myFutureGuards(mid){ const t=todayS(); return S.oncall.filter(g=>g.memberId===mid && g.end>=t).sort((a,b)=>a.start.localeCompare(b.start)); }
 const gLabel = g => `${nice(g.start)} – ${nice(g.end)}`;
 function reqGuardSwap(){
+  if(ui.asMember) return toast('Estás en Vista usuario: solo puedes mirar');
   const me=myMember(); if(!me) return toast('Tu usuario no está vinculado a un integrante');
   const mine=myFutureGuards(me.id); if(!mine.length) return toast('No tienes guardias próximas para intercambiar');
   openModal(`<h3>🚨 Intercambiar guardia</h3><p class="muted" style="margin-top:0">Tu compañero debe aceptar y después el administrador lo aprueba.</p>
@@ -670,6 +680,7 @@ function sendGuardSwap(){
 }
 /* ---- Acciones ---- */
 function reqAct(id, action){
+  if(ui.asMember) return toast('Estás en Vista usuario: solo puedes mirar');
   const r = Object.assign({id}, requests[id]); if(!r.kind) return;
   const ref = firebase.database().ref('requests/'+id), who=(fbUser?.email||'').toLowerCase();
   const upd = o => ref.update(Object.assign({updatedAt:todayS(), updatedBy:who}, o)).then(()=>toast('Listo')).catch(e=>toast('No se pudo: '+e.message));
@@ -705,18 +716,42 @@ function reqAct(id, action){
 function renderBadge(){ const n = S.vacations.filter(v=>v.status==='Pendiente').length + (isEditor ? reqList().filter(reqNeedsAdmin).length : reqList().filter(reqIncoming).length); const b=document.getElementById('pendBadge'); b.textContent=n; b.classList.toggle('hidden', !n); }
 function isMobile(){ return window.matchMedia('(max-width:700px)').matches; }
 window.matchMedia('(max-width:700px)').addEventListener('change', ()=>render());
-function render(){ const f = {dashboard,calendar,vacations,oncall,schedules,team,settings}[ui.view]; document.getElementById('main').innerHTML = f(); renderBadge();
+function render(){ const f = {dashboard,calendar,vacations,oncall,schedules,team,settings,userview}[ui.view] || dashboard; document.getElementById('main').innerHTML = asBanner() + f(); renderBadge();
   if(dbRef && !isEditor) document.querySelectorAll('#main [onchange*="S."],#main [oninput*="S."]').forEach(el=>{ el.disabled=true; el.removeAttribute('onchange'); el.removeAttribute('oninput'); });
 }
 
 /* ================== Vista: Resumen ================== */
+function userview(){
+  if(!isEditor && !ui.asMember) return '<div class="panel empty">Solo disponible para administradores.</div>';
+  const groups=['Colaboración','MM','Desarrollo'];
+  return `<div class="head"><h2>Vista usuario</h2></div>
+    <div class="panel"><p class="muted" style="margin-top:0">Elige a una persona para ver la página exactamente como la ve ella: su saldo, sus solicitudes, sus avisos y sin opciones de edición. Es solo para mirar; no se puede enviar ni cambiar nada en su nombre.</p>
+    ${groups.map(g=>{ const ms=S.members.filter(m=>(m.group||'Colaboración')===g); return ms.length?`<p style="font-weight:600;margin:14px 0 6px">${g}</p><div class="uvgrid">${ms.map(m=>`<button class="uvcard" onclick="startAs('${m.id}')"><span class="gav" style="background:${m.color}">${esc(m.name.split(' ').filter(w=>/^[A-ZÁÉÍÓÚÑ]/.test(w)).slice(0,2).map(w=>w[0]).join(''))}</span><span style="text-align:left"><b>${esc(m.name)}</b><br><span class="muted" style="font-size:12px">${m.email?esc(m.email):'Sin correo vinculado'}</span></span></button>`).join('')}</div>`:''; }).join('')}
+    </div>`;
+}
+function asBanner(){
+  if(!ui.asMember) return '';
+  const m=member(ui.asMember);
+  return `<div class="asbar"><span>👁 Estás viendo la página como <b>${esc(m?m.name:'')}</b> (solo lectura)</span>
+    <select onchange="startAs(this.value)">${S.members.map(x=>`<option value="${x.id}" ${x.id===ui.asMember?'selected':''}>${esc(x.name)}</option>`).join('')}</select>
+    <button class="btn sm" onclick="stopAs()">Salir de la vista</button></div>`;
+}
+function startAs(id){
+  if(!ui.asMember){ if(!isEditor) return; ui.realEditor = isEditor; ui.prevView = ui.view; }
+  ui.asMember = id; isEditor = false; document.body.classList.add('ro');
+  closeModal(); go(ui.view==='userview'?'dashboard':ui.view);
+}
+function stopAs(){
+  isEditor = !!ui.realEditor; ui.asMember = null; document.body.classList.toggle('ro', !isEditor);
+  go('userview');
+}
 function holidaysPanel(t){
   const y=+t.slice(0,4), today=holidayOn(t);
-  const next=[...holidaysOfYear(y),...holidaysOfYear(y+1)].filter(h=>h.date>t).slice(0,3);
+  const next=holidaysOfYear(y).filter(h=>h.date>t && h.date.slice(0,7)===t.slice(0,7));
   if(!today && !next.length) return '';
   const when = d => { const x=pd(d); return `${['dom','lun','mar','mié','jue','vie','sáb'][x.getDay()]} ${x.getDate()} ${MONTHS[x.getMonth()].slice(0,3).toLowerCase()}${x.getFullYear()!==y?' '+x.getFullYear():''}`; };
   const left = d => { const n=Math.round((pd(d)-pd(t))/864e5); return n===1?'mañana':`en ${n} días`; };
-  return `<div class="panel notices hols"><h3 style="margin:0">🎉 ${today?'Hoy es día festivo':'Próximos días festivos'}</h3>
+  return `<div class="panel notices hols"><h3 style="margin:0">🎉 ${today?'Hoy es día festivo':'Días festivos de '+MONTHS[pd(t).getMonth()].toLowerCase()}</h3>
     ${today?`<div class="notice"><div>🎉 <b>${esc(today.name)}</b><span class="hchip">📅 hoy</span></div></div>`:''}
     ${next.map(h=>`<div class="notice"><div>🎉 ${esc(h.name)}<span class="hchip">📅 ${when(h.date)}</span> <span class="muted" style="font-size:12px">${left(h.date)}</span></div></div>`).join('')}</div>`;
 }
@@ -1553,8 +1588,10 @@ function doLogin(e){
 function guardPhone(team){ const p=(S.settings.guardPhones||{})[team]; return (p!=null && p!=='') ? p : (GUARD_PHONES_DEFAULT[team]||''); }
 function fmtPhone(p){ const d=String(p).replace(/\D/g,''); return d.length===10 ? `${d.slice(0,2)} ${d.slice(2,6)} ${d.slice(6)}` : p; }
 function phoneLink(team){ const p=guardPhone(team); return p ? `<a class="gphone" href="tel:${esc(String(p).replace(/[^\d+]/g,''))}">📞 ${esc(fmtPhone(p))}</a>` : ''; }
-function myMember(){ if(!fbUser) return null; const e=(fbUser.email||'').trim().toLowerCase(); return S.members.find(m=>e && (m.email||'').trim().toLowerCase()===e) || null; }
-function roleLabel(){ return isOwner ? '👑 Propietario' : (isEditor ? '✏️ Administrador' : '👁 Solo lectura'); }
+function myMember(){ if(ui.asMember) return member(ui.asMember) || null;
+  return myMemberReal(); }
+function myMemberReal(){ if(!fbUser) return null; const e=(fbUser.email||'').trim().toLowerCase(); return S.members.find(m=>e && (m.email||'').trim().toLowerCase()===e) || null; }
+function roleLabel(){ if(ui.asMember) return '👁 Vista de usuario'; return isOwner ? '👑 Propietario' : (isEditor ? '✏️ Administrador' : '👁 Solo lectura'); }
 function addEditor(){
   const uid=val('edUid').trim(), name=val('edName').trim();
   if(!uid) return toast('Pega el UID del usuario');
@@ -1582,7 +1619,8 @@ function resetPass(){
     if(!user){ isEditor=false; document.body.classList.remove('ro'); showLogin(''); return; }
     isOwner = user.uid === EDITOR_UID;
     const applyRole = () => {
-      isEditor = isOwner || !!editors[user.uid];
+      const ed = isOwner || !!editors[user.uid];
+      if(ui.asMember){ ui.realEditor = ed; isEditor = false; } else isEditor = ed;
       document.body.classList.toggle('ro', !isEditor);
       document.getElementById('whoami').innerHTML = `${myMember()?`<b>${esc(myMember().name)}</b><br>`:''}${esc(user.email)}<br><b>${roleLabel()}</b>`;
     };

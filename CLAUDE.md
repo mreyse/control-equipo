@@ -61,6 +61,9 @@ Ver `database.rules.json`. Resumen: lectura para cualquier autenticado; `/contro
 ## Preferencias de diseño del usuario (ya aplicadas)
 - Calendario: vista predeterminada **Semana** (también Día y Mes). Ausencias y turnos **sin relleno**, solo línea de color a la izquierda. Guardia + vacaciones de la misma persona en **una sola línea** (🚨🌴).
 - Resumen: tarjetas en orden **De guardia hoy · Ausentes hoy · Integrantes · Solicitudes pendientes**; luego Turnos de hoy (3 columnas: Turnos / Oficina / Horario fijo) a la izquierda y Próximas guardias (línea de tiempo) a la derecha; después Ausencias próximas; luego Pendientes/Mis solicitudes y Saldo; Conflictos al final (solo editores).
+- Menú lateral en orden: Resumen · Horarios · Vacaciones/Ausencias · Guardias · Calendario · Equipo · Vista usuario (solo editores) · Ajustes.
+- **Vista usuario:** el editor elige a una persona y ve toda la página como ella (`ui.asMember`, fuerza solo lectura; acciones de solicitudes bloqueadas). Banner amarillo para cambiar de persona o salir.
+- Festivos en Resumen: solo los del mes en curso.
 - Vista móvil: barra de navegación inferior y calendario en lista.
 
 ## Flujo de trabajo para cambios
