@@ -1252,7 +1252,7 @@ function vacHistoryPanel(){
 function vacForm(id){
   if(id && !S.vacations.find(x=>x.id===id)) return;
   if(!S.members.length){ go('team'); return toast('Agrega primero a tu equipo'); }
-  const v = id ? S.vacations.find(x=>x.id===id) : { memberId:S.members[0].id, type:'Vacaciones', start:todayS(), end:todayS(), status:'Pendiente', requestedAt:todayS(), notes:'' };
+  const v = id ? S.vacations.find(x=>x.id===id) : { memberId:S.members[0].id, type:'Vacaciones', start:todayS(), end:todayS(), status:'Aprobada', requestedAt:todayS(), notes:'' };
   openModal(`<h3>${id?'Editar':'Nueva'} solicitud</h3>
     <div class="form">
       <label class="f">Integrante<select id="vMember" onchange="vacPreview('${id||''}')">${memberOptions(v.memberId)}</select></label>
