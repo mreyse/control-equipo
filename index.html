@@ -283,7 +283,7 @@ table.mh .today{background:#f6f9ff}
 table.mh td.off{color:#b5bccb}
 table.mh td.hol{color:#a32d2d}
 table.mh td.fixedh{color:#555d6e}
-.mnrow{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0;border-bottom:1px solid #f0f2f6}.mnrow:last-child{border-bottom:0}.hchip{background:#eef1f6;color:#3d4452;border-radius:999px;padding:3px 10px;font-size:12px}.mnrow.mnhead{font-size:11px;color:var(--muted,#8a93a3);padding:0 0 2px}
+.mnrow{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0;border-bottom:1px solid #f0f2f6}.mnrow:last-child{border-bottom:0}table.mh .hxn{font-size:11px;color:#8a5a00;margin-top:2px;white-space:nowrap}.hchip{background:#eef1f6;color:#3d4452;border-radius:999px;padding:3px 10px;font-size:12px}.mnrow.mnhead{font-size:11px;color:var(--muted,#8a93a3);padding:0 0 2px}
 table.mh td.rolec{color:var(--muted);font-size:12px}
 table.mh td.hrs{color:var(--muted);text-align:right}
 table.mh .mrole{display:none}
@@ -1454,7 +1454,10 @@ function mhHead(week, first){
 function mhCell(mid, s, content, cls, title){
   const gd = S.oncall.find(g=>g.memberId===mid && inRange(s,g.start,g.end));
   const ov = S.rotation.overrides[mid+'|'+s];
-  return `<td class="sc ${s===todayS()?'today':''} ${cls||''}" onclick="cellEdit('${mid}','${s}')" title="${esc(title||'')}${gd?' · Guardia '+esc(gd.team||''):''}">${content}${ov?'<span class="ovm">✎</span>':''}${gd?'<span class="gemo">🚨</span>':''}</td>`;
+  // Horas extras a cambiar: solo una nota con el horario en que estará fuera
+  const hx = S.vacations.find(v=>v.memberId===mid && v.status==='Aprobada' && isHX(v) && v.start===s);
+  const hxTxt = hx ? `Fuera ${hx.tStart||''}–${hx.tEnd||''}` : '';
+  return `<td class="sc ${s===todayS()?'today':''} ${cls||''}" onclick="cellEdit('${mid}','${s}')" title="${esc(title||'')}${gd?' · Guardia '+esc(gd.team||''):''}${hx?' · '+esc(hxTxt):''}">${content}${ov?'<span class="ovm">✎</span>':''}${gd?'<span class="gemo">🚨</span>':''}${hx?`<div class="hxn">⏱ ${esc(hxTxt)}</div>`:''}</td>`;
 }
 function schedules(){
   syncRotation();
