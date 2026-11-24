@@ -283,7 +283,7 @@ table.mh .today{background:#f6f9ff}
 table.mh td.off{color:#b5bccb}
 table.mh td.hol{color:#a32d2d}
 table.mh td.fixedh{color:#555d6e}
-.mnrow{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0;border-bottom:1px solid #f0f2f6}.mnrow:last-child{border-bottom:0}.mnrow.mnhead{font-size:11px;color:var(--muted,#8a93a3);padding:0 0 2px}
+.mnrow{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0;border-bottom:1px solid #f0f2f6}.mnrow:last-child{border-bottom:0}.hchip{background:#eef1f6;color:#3d4452;border-radius:999px;padding:3px 10px;font-size:12px}.mnrow.mnhead{font-size:11px;color:var(--muted,#8a93a3);padding:0 0 2px}
 table.mh td.rolec{color:var(--muted);font-size:12px}
 table.mh td.hrs{color:var(--muted);text-align:right}
 table.mh .mrole{display:none}
@@ -1192,8 +1192,10 @@ function calNav(n){
 
 /* ================== Vista: Vacaciones ================== */
 function vacations(){
-  const list = S.vacations.filter(v=>(ui.vacFilter==='Todas'||v.status===ui.vacFilter) && groupFilter(ui.vacMember, v.memberId))
-    .sort((a,b)=>b.start.localeCompare(a.start));
+  const t = todayS();
+  const all = S.vacations.filter(v=>(ui.vacFilter==='Todas'||v.status===ui.vacFilter) && groupFilter(ui.vacMember, v.memberId));
+  const list = all.filter(v=>(v.end||v.start)>=t).sort((a,b)=>b.start.localeCompare(a.start));
+  const past = all.length - list.length;
   return `
   <div class="head"><h2>Solicitudes de vacaciones y ausencias</h2>
     <div class="toolbar">
@@ -1221,7 +1223,32 @@ function vacations(){
       <td style="white-space:nowrap;text-align:right">
         ${v.status==='Pendiente'?`<button class="btn ok sm" onclick="setStatus('${v.id}','Aprobada')">✓</button> <button class="btn bad sm" onclick="setStatus('${v.id}','Rechazada')">✕</button>`:''}
         <button class="btn sec sm" onclick="vacForm('${v.id}')">Editar</button></td></tr>`;}).join('')}
-  </table>`:'<div class="empty">No hay solicitudes con este filtro.</div>'}</div>`;
+  </table>`:'<div class="empty">No hay solicitudes vigentes o próximas con este filtro.</div>'}
+  ${past?`<p class="muted" style="font-size:12px;margin:10px 0 0">No se muestran ${past} ${past===1?'registro que ya terminó':'registros que ya terminaron'}.${isEditor?' Consúltalos en el historial de abajo.':''}</p>`:''}</div>
+  ${isEditor?vacHistoryPanel():''}`;
+}
+// Historial por integrante (solo administradores): todo lo registrado y solicitado, incluidas fechas pasadas
+function vacHistoryPanel(){
+  const mid = ui.histMember || '';
+  const m = member(mid);
+  let body = '<p class="muted" style="margin:6px 0 0">Elige a una persona para ver todas sus vacaciones, ausencias y solicitudes, incluidas las que ya pasaron.</p>';
+  if(m){
+    const recs = S.vacations.filter(v=>v.memberId===mid).sort((a,b)=>b.start.localeCompare(a.start));
+    const reqs = reqList().filter(r=>r.memberId===mid).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+    const yr = +todayS().slice(0,4), used = usedDays(mid, yr), tot = m.vacDays ?? S.settings.defaultDays;
+    const byType = {}; recs.filter(v=>v.status==='Aprobada').forEach(v=>{ byType[v.type]=(byType[v.type]||0)+1; });
+    body = `<div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0">
+        <span class="hchip">Vacaciones ${yr}: <b>${used}</b> de ${tot} días usados</span>
+        ${Object.entries(byType).map(([k,n])=>`<span class="hchip">${esc(k)}: ${n}</span>`).join('')}
+        <span class="hchip">Solicitudes enviadas: ${reqs.length}</span></div>
+      ${recs.length?`<table><tr><th>Tipo</th><th>Fechas</th><th>Duración</th><th>Estado</th><th>Solicitada</th><th></th></tr>
+        ${recs.map(v=>`<tr ${(v.end||v.start)<todayS()?'style="opacity:.7"':''}><td>${esc(v.type)}${v.notes?`<br><span class="muted" style="font-size:12px">${esc(v.notes)}</span>`:''}</td><td>${vacWhen(v)}</td><td>${vacDur(v)}</td><td><span class="pill ${v.status}">${v.status}</span></td><td class="muted">${nice(v.requestedAt)}</td><td style="text-align:right"><button class="btn sec sm" onclick="vacForm('${v.id}')">Editar</button></td></tr>`).join('')}</table>`
+        :'<div class="empty">Sin vacaciones ni ausencias registradas.</div>'}
+      ${reqs.length?`<p style="margin:16px 0 6px;font-weight:600;font-size:13px">📨 Solicitudes enviadas desde la página</p>${reqRows(reqs,false)}`:''}`;
+  }
+  return `<div class="panel"><h3>🗂 Historial por integrante</h3>
+    <div class="toolbar"><select onchange="ui.histMember=this.value;render()" style="min-width:240px"><option value="">Buscar integrante…</option>${S.members.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(x=>`<option value="${x.id}" ${x.id===mid?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>
+    ${body}</div>`;
 }
 function vacForm(id){
   if(id && !S.vacations.find(x=>x.id===id)) return;
