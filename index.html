@@ -1194,7 +1194,7 @@ function calNav(n){
 function vacations(){
   const t = todayS();
   const all = S.vacations.filter(v=>(ui.vacFilter==='Todas'||v.status===ui.vacFilter) && groupFilter(ui.vacMember, v.memberId));
-  const list = all.filter(v=>(v.end||v.start)>=t).sort((a,b)=>b.start.localeCompare(a.start));
+  const list = all.filter(v=>(v.end||v.start)>=t).sort((a,b)=>a.start.localeCompare(b.start) || (a.tStart||'').localeCompare(b.tStart||''));
   const past = all.length - list.length;
   return `
   <div class="head"><h2>Solicitudes de vacaciones y ausencias</h2>
