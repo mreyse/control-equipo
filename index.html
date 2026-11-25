@@ -283,7 +283,7 @@ table.mh .today{background:#f6f9ff}
 table.mh td.off{color:#b5bccb}
 table.mh td.hol{color:#a32d2d}
 table.mh td.fixedh{color:#555d6e}
-.mnrow{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0;border-bottom:1px solid #f0f2f6}.mnrow:last-child{border-bottom:0}table.mh .hxn{font-size:11px;color:#8a5a00;margin-top:2px;white-space:nowrap}.hchip{background:#eef1f6;color:#3d4452;border-radius:999px;padding:3px 10px;font-size:12px}.mnrow.mnhead{font-size:11px;color:var(--muted,#8a93a3);padding:0 0 2px}
+.mnrow{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0;border-bottom:1px solid #f0f2f6}.mnrow:last-child{border-bottom:0}table.mh .hxn{font-size:11px;color:#8a5a00;margin-top:2px;white-space:nowrap}table.mh .covn2{color:#4a5568}.hchip{background:#eef1f6;color:#3d4452;border-radius:999px;padding:3px 10px;font-size:12px}.mnrow.mnhead{font-size:11px;color:var(--muted,#8a93a3);padding:0 0 2px}
 table.mh td.rolec{color:var(--muted);font-size:12px}
 table.mh td.hrs{color:var(--muted);text-align:right}
 table.mh .mrole{display:none}
@@ -1457,7 +1457,8 @@ function mhCell(mid, s, content, cls, title){
   // Horas extras a cambiar: solo una nota con el horario en que estará fuera
   const hx = S.vacations.find(v=>v.memberId===mid && v.status==='Aprobada' && isHX(v) && v.start===s);
   const hxTxt = hx ? `Fuera ${hx.tStart||''}–${hx.tEnd||''}` : '';
-  return `<td class="sc ${s===todayS()?'today':''} ${cls||''}" onclick="cellEdit('${mid}','${s}')" title="${esc(title||'')}${gd?' · Guardia '+esc(gd.team||''):''}${hx?' · '+esc(hxTxt):''}">${content}${ov?'<span class="ovm">✎</span>':''}${gd?'<span class="gemo">🚨</span>':''}${hx?`<div class="hxn">⏱ ${esc(hxTxt)}</div>`:''}</td>`;
+  const cov = ov && ov.cover ? mName(ov.cover) : '';
+  return `<td class="sc ${s===todayS()?'today':''} ${cls||''}" onclick="cellEdit('${mid}','${s}')" title="${esc(title||'')}${gd?' · Guardia '+esc(gd.team||''):''}${hx?' · '+esc(hxTxt):''}${cov?' · Cubre: '+esc(cov):''}">${content}${ov?'<span class="ovm">✎</span>':''}${gd?'<span class="gemo">🚨</span>':''}${hx?`<div class="hxn">⏱ ${esc(hxTxt)}</div>`:''}${cov?`<div class="hxn covn2">↔ Cubre: ${esc(cov.split(' ')[0])}</div>`:''}</td>`;
 }
 function schedules(){
   syncRotation();
@@ -1528,14 +1529,20 @@ function cellEdit(mid, s){
     <div class="form">
       <label class="f">Turno de este día<select id="cShift">${SHIFTS.map(x=>`<option ${x===(ov?ov.shift:role)?'selected':''}>${x}</option>`).join('')}</select></label>
       <label class="f">Nota<input id="cNote" value="${esc(ov?.note||'')}" placeholder="Ej. intercambio con Edgar"></label>
+      <label class="f">Quién cubre su turno<select id="cCover" onchange="document.getElementById('cSwapW').style.display=this.value?'':'none'"><option value="">— Nadie / no aplica —</option>${S.members.filter(x=>x.id!==mid && x.shifts!==false).map(x=>`<option value="${x.id}" ${ov?.cover===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
+      <label class="f" id="cSwapW" style="flex-direction:row;align-items:center;gap:8px;${ov?.cover?'':'display:none'}"><input type="checkbox" id="cSwap" ${ov?.cover?'':'checked'}> Intercambio: a esa persona ponerle este día el turno <b>${role}</b></label>
     </div>
     <div class="actions">${ov?`<button class="btn sec" style="margin-right:auto" onclick="delete S.rotation.overrides['${mid}|${s}'];save();closeModal();render()">Volver al turno del rol</button>`:''}
       <button class="btn sec" onclick="closeModal()">Cancelar</button>
       <button class="btn" onclick="saveCell('${mid}','${s}')">Guardar</button></div>`);
 }
 function saveCell(mid, s){
-  const sh = val('cShift'), note = val('cNote').trim(), k = mid+'|'+s;
-  if(sh===roleShift(mid,s) && !note) delete S.rotation.overrides[k]; else S.rotation.overrides[k] = {shift:sh, note};
+  const sh = val('cShift'), note = val('cNote').trim(), cover = val('cCover'), k = mid+'|'+s;
+  const swap = cover && document.getElementById('cSwap').checked;
+  if(sh===roleShift(mid,s) && !note && !cover) delete S.rotation.overrides[k];
+  else S.rotation.overrides[k] = Object.assign({shift:sh, note}, cover?{cover}:{});
+  // Intercambio: a quien cubre le toca el turno original de esta persona y queda anotado quién lo cubre a él
+  if(swap) S.rotation.overrides[cover+'|'+s] = {shift:roleShift(mid,s), note, cover:mid};
   save(); closeModal(); render();
 }
 function rotForm(keep){
