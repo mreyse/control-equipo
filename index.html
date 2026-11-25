@@ -1457,9 +1457,11 @@ function mhCell(mid, s, content, cls, title){
   // Horas extras a cambiar: solo una nota con el horario en que estará fuera
   const hx = S.vacations.find(v=>v.memberId===mid && v.status==='Aprobada' && isHX(v) && v.start===s);
   const hxTxt = hx ? `Fuera ${hx.tStart||''}–${hx.tEnd||''}` : '';
-  const cov = ov && ov.cover ? mName(ov.cover) : '';
+  // Quien descansa porque otro lo cubre (intercambio de sábado) no lleva nota ni marca; la nota va solo en quien trabaja
+  const quiet = ov && ov.cover && ov.shift==='Descanso';
+  const cov = ov && ov.cover && !quiet ? mName(ov.cover) : '';
   const covFor = ov && ov.coverFor ? mName(ov.coverFor) : '';
-  return `<td class="sc ${s===todayS()?'today':''} ${cls||''}" onclick="cellEdit('${mid}','${s}')" title="${esc(title||'')}${gd?' · Guardia '+esc(gd.team||''):''}${hx?' · '+esc(hxTxt):''}${cov?' · Cubre: '+esc(cov):''}${covFor?' · Cubre a: '+esc(covFor):''}">${content}${ov?'<span class="ovm">✎</span>':''}${gd?'<span class="gemo">🚨</span>':''}${hx?`<div class="hxn">⏱ ${esc(hxTxt)}</div>`:''}${cov?`<div class="hxn covn2">↔ Cubre: ${esc(cov.split(' ')[0])}</div>`:''}${covFor?`<div class="hxn covn2">↔ Cubre a ${esc(covFor.split(' ')[0])}</div>`:''}</td>`;
+  return `<td class="sc ${s===todayS()?'today':''} ${cls||''}" onclick="cellEdit('${mid}','${s}')" title="${esc(title||'')}${gd?' · Guardia '+esc(gd.team||''):''}${hx?' · '+esc(hxTxt):''}${cov?' · Cubre: '+esc(cov):''}${covFor?' · Cubre a: '+esc(covFor):''}">${content}${ov&&!quiet?'<span class="ovm">✎</span>':''}${gd?'<span class="gemo">🚨</span>':''}${hx?`<div class="hxn">⏱ ${esc(hxTxt)}</div>`:''}${cov?`<div class="hxn covn2">↔ Cubre: ${esc(cov.split(' ')[0])}</div>`:''}${covFor?`<div class="hxn covn2">↔ Intercambio · Cubre a ${esc(covFor.split(' ')[0])}</div>`:''}</td>`;
 }
 function schedules(){
   syncRotation();
