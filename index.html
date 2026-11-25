@@ -283,7 +283,7 @@ table.mh .today{background:#f6f9ff}
 table.mh td.off{color:#b5bccb}
 table.mh td.hol{color:#a32d2d}
 table.mh td.fixedh{color:#555d6e}
-.mnrow{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0;border-bottom:1px solid #f0f2f6}.mnrow:last-child{border-bottom:0}table.mh .hxn{font-size:11px;color:#8a5a00;margin-top:2px;white-space:nowrap}table.mh .covn2{color:#4a5568}.hchip{background:#eef1f6;color:#3d4452;border-radius:999px;padding:3px 10px;font-size:12px}.mnrow.mnhead{font-size:11px;color:var(--muted,#8a93a3);padding:0 0 2px}
+.mnrow{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0;border-bottom:1px solid #f0f2f6}.mnrow:last-child{border-bottom:0}table.mh .hxn{font-size:11px;color:#8a5a00;margin-top:2px;white-space:nowrap}table.mh .covn2{color:#4a5568;white-space:normal;line-height:1.25}.hchip{background:#eef1f6;color:#3d4452;border-radius:999px;padding:3px 10px;font-size:12px}.mnrow.mnhead{font-size:11px;color:var(--muted,#8a93a3);padding:0 0 2px}
 table.mh td.rolec{color:var(--muted);font-size:12px}
 table.mh td.hrs{color:var(--muted);text-align:right}
 table.mh .mrole{display:none}
@@ -1435,6 +1435,10 @@ function memberAtPos(p, s){ return lineup(weekIdx(s))[p]; }
 function roleShift(mid, s){ const p=positionOf(mid,s); if(p<0) return 'Descanso'; return S.rotation.positions[p].days[dow(pd(s))] || 'Descanso'; }
 function isOnsite(mid, s){ const p=positionOf(mid,s); if(p<0) return false; const pos=S.rotation.positions[p]; return (pos.onsite||[]).includes(dow(pd(s))) && shiftOf(mid,s)==='Oficina'; }
 function shiftOf(mid, s){ const o=S.rotation.overrides[mid+'|'+s]; return o ? o.shift : (holidayOn(s) ? 'Festivo' : roleShift(mid,s)); }
+// ¿Ausente ese día? (vacaciones/ausencia aprobada o descanso por cambio manual)
+function awayOn(mid, s){ return S.vacations.some(v=>v.memberId===mid && v.status==='Aprobada' && !isHX(v) && inRange(s,v.start,v.end)) || S.rotation.overrides[mid+'|'+s]?.shift==='Descanso'; }
+// ¿Alguien (distinto de exceptMid) trabaja ese turno ese día?
+function shiftCovered(sh, s, exceptMid){ return S.members.some(m=>m.id!==exceptMid && !awayOn(m.id,s) && shiftOf(m.id,s)===sh); }
 function workHours(a,b){ return Math.max(0, hoursBetween(a,b) - MEAL_H); }
 function shiftHours(sh){ const h=S.rotation.hours[sh]; return h ? workHours(h.start,h.end) : 0; }
 
@@ -1457,11 +1461,17 @@ function mhCell(mid, s, content, cls, title){
   // Horas extras a cambiar: solo una nota con el horario en que estará fuera
   const hx = S.vacations.find(v=>v.memberId===mid && v.status==='Aprobada' && isHX(v) && v.start===s);
   const hxTxt = hx ? `Fuera ${hx.tStart||''}–${hx.tEnd||''}` : '';
-  // Quien descansa porque otro lo cubre (intercambio de sábado) no lleva nota ni marca; la nota va solo en quien trabaja
-  const quiet = ov && ov.cover && ov.shift==='Descanso';
-  const cov = ov && ov.cover && !quiet ? mName(ov.cover) : '';
-  const covFor = ov && ov.coverFor ? mName(ov.coverFor) : '';
-  return `<td class="sc ${s===todayS()?'today':''} ${cls||''}" onclick="cellEdit('${mid}','${s}')" title="${esc(title||'')}${gd?' · Guardia '+esc(gd.team||''):''}${hx?' · '+esc(hxTxt):''}${cov?' · Cubre: '+esc(cov):''}${covFor?' · Cubre a: '+esc(covFor):''}">${content}${ov&&!quiet?'<span class="ovm">✎</span>':''}${gd?'<span class="gemo">🚨</span>':''}${hx?`<div class="hxn">⏱ ${esc(hxTxt)}</div>`:''}${cov?`<div class="hxn covn2">↔ Cubre: ${esc(cov.split(' ')[0])}</div>`:''}${covFor?`<div class="hxn covn2">↔ Intercambio · Cubre a ${esc(covFor.split(' ')[0])}</div>`:''}</td>`;
+  // Notas de intercambio: solo en quien trabaja. Si su compañero está ausente (vacaciones o descanso) dice «Cubre a X»;
+  // quien está ausente no lleva nota ni marca.
+  const partner = ov && (ov.cover || ov.coverFor);
+  const quiet = !!partner && awayOn(mid, s);
+  const partnerOff = !!partner && !quiet && awayOn(partner, s);
+  const cov = partner && !quiet && !partnerOff && ov.cover ? mName(ov.cover) : '';
+  const covFor = partner && !quiet && (partnerOff || ov.coverFor) ? mName(partner) : '';
+  // Si al cubrir deja su propio turno (Mañana/Mutante/Tarde) y nadie más lo hace: solo en el texto al pasar el cursor
+  const own = roleShift(mid, s);
+  const leftOpen = partner && !quiet && ov.shift!==own && COVER.includes(own) && !holidayOn(s) && !shiftCovered(own, s, null);
+  return `<td class="sc ${s===todayS()?'today':''} ${cls||''}" onclick="cellEdit('${mid}','${s}')" title="${esc(title||'')}${gd?' · Guardia '+esc(gd.team||''):''}${hx?' · '+esc(hxTxt):''}${cov?' · Cubre: '+esc(cov):''}${covFor?' · Cubre a: '+esc(covFor):''}${leftOpen?' · Su turno '+own+' queda sin cubrir':''}">${content}${ov&&!quiet?'<span class="ovm">✎</span>':''}${gd?'<span class="gemo">🚨</span>':''}${hx?`<div class="hxn">⏱ ${esc(hxTxt)}</div>`:''}${cov?`<div class="hxn covn2">↔ Cubre: ${esc(cov.split(' ')[0])}</div>`:''}${covFor?`<div class="hxn covn2">↔ Intercambio · Cubre a ${esc(covFor.split(' ')[0])}</div>`:''}</td>`;
 }
 function schedules(){
   syncRotation();
@@ -1475,7 +1485,7 @@ function schedules(){
       const vac = S.vacations.find(v=>v.memberId===mid && v.status==='Aprobada' && !isHX(v) && inRange(s,v.start,v.end));
       const ov = R.overrides[mid+'|'+s];
       const sh = shiftOf(mid,s);
-      if(vac){ const warn = !holidayOn(s) && COVER.includes(roleShift(mid,s)) ? `<span class="swarn">${roleShift(mid,s).toLowerCase()} sin cubrir</span>` : '';
+      if(vac){ const warn = !holidayOn(s) && COVER.includes(roleShift(mid,s)) && !shiftCovered(roleShift(mid,s), s, mid) ? `<span class="swarn">${roleShift(mid,s).toLowerCase()} sin cubrir</span>` : '';
         return mhCell(mid, s, `<span class="svac">${esc(vac.type)}</span>${warn}`, '', vac.type); }
       hrs += shiftHours(sh);
       if(sh==='Descanso') return mhCell(mid, s, '—', 'off', 'Descanso');
