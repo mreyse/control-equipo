@@ -1458,7 +1458,8 @@ function mhCell(mid, s, content, cls, title){
   const hx = S.vacations.find(v=>v.memberId===mid && v.status==='Aprobada' && isHX(v) && v.start===s);
   const hxTxt = hx ? `Fuera ${hx.tStart||''}–${hx.tEnd||''}` : '';
   const cov = ov && ov.cover ? mName(ov.cover) : '';
-  return `<td class="sc ${s===todayS()?'today':''} ${cls||''}" onclick="cellEdit('${mid}','${s}')" title="${esc(title||'')}${gd?' · Guardia '+esc(gd.team||''):''}${hx?' · '+esc(hxTxt):''}${cov?' · Cubre: '+esc(cov):''}">${content}${ov?'<span class="ovm">✎</span>':''}${gd?'<span class="gemo">🚨</span>':''}${hx?`<div class="hxn">⏱ ${esc(hxTxt)}</div>`:''}${cov?`<div class="hxn covn2">↔ Cubre: ${esc(cov.split(' ')[0])}</div>`:''}</td>`;
+  const covFor = ov && ov.coverFor ? mName(ov.coverFor) : '';
+  return `<td class="sc ${s===todayS()?'today':''} ${cls||''}" onclick="cellEdit('${mid}','${s}')" title="${esc(title||'')}${gd?' · Guardia '+esc(gd.team||''):''}${hx?' · '+esc(hxTxt):''}${cov?' · Cubre: '+esc(cov):''}${covFor?' · Cubre a: '+esc(covFor):''}">${content}${ov?'<span class="ovm">✎</span>':''}${gd?'<span class="gemo">🚨</span>':''}${hx?`<div class="hxn">⏱ ${esc(hxTxt)}</div>`:''}${cov?`<div class="hxn covn2">↔ Cubre: ${esc(cov.split(' ')[0])}</div>`:''}${covFor?`<div class="hxn covn2">↔ Cubre a ${esc(covFor.split(' ')[0])}</div>`:''}</td>`;
 }
 function schedules(){
   syncRotation();
@@ -1530,17 +1531,35 @@ function cellEdit(mid, s){
       <label class="f">Turno de este día<select id="cShift">${SHIFTS.map(x=>`<option ${x===(ov?ov.shift:role)?'selected':''}>${x}</option>`).join('')}</select></label>
       <label class="f">Nota<input id="cNote" value="${esc(ov?.note||'')}" placeholder="Ej. intercambio con Edgar"></label>
       <label class="f">Quién cubre su turno<select id="cCover" onchange="document.getElementById('cSwapW').style.display=this.value?'':'none'"><option value="">— Nadie / no aplica —</option>${S.members.filter(x=>x.id!==mid && x.shifts!==false).map(x=>`<option value="${x.id}" ${ov?.cover===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
-      <label class="f" id="cSwapW" style="flex-direction:row;align-items:center;gap:8px;${ov?.cover?'':'display:none'}"><input type="checkbox" id="cSwap" ${ov?.cover?'':'checked'}> Intercambio: a esa persona ponerle este día el turno <b>${role}</b></label>
+      <label class="f" id="cSwapW" style="flex-direction:row;align-items:center;gap:8px;${ov?.cover?'':'display:none'}"><input type="checkbox" id="cSwap" ${ov?.cover?'':'checked'}> <span>${isSatSwap(mid,s)?`Intercambio de sábado: esa persona trabaja este sábado y <b>${esc(mName(mid).split(' ')[0])}</b> cubre el próximo sábado que le toque a ella`:`Intercambio: a esa persona ponerle este día el turno <b>${role}</b>`}</span></label>
     </div>
     <div class="actions">${ov?`<button class="btn sec" style="margin-right:auto" onclick="delete S.rotation.overrides['${mid}|${s}'];save();closeModal();render()">Volver al turno del rol</button>`:''}
       <button class="btn sec" onclick="closeModal()">Cancelar</button>
       <button class="btn" onclick="saveCell('${mid}','${s}')">Guardar</button></div>`);
+}
+// ¿Es un sábado en que esta persona trabaja por su rol? (turno único del sábado)
+function isSatSwap(mid, s){ const r=roleShift(mid,s); return dow(pd(s))===5 && r && r!=='Descanso' && r!=='Festivo'; }
+// Próximo sábado (después de s) en que a esa persona le toca trabajar según su rol
+function nextWorkSaturday(mid, s){
+  const d=pd(s); for(let w=1; w<=60; w++){ const x=new Date(d); x.setDate(d.getDate()+7*w); const xs=fd(x);
+    const r=roleShift(mid,xs); if(r && r!=='Descanso' && r!=='Festivo') return xs; }
+  return null;
 }
 function saveCell(mid, s){
   const sh = val('cShift'), note = val('cNote').trim(), cover = val('cCover'), k = mid+'|'+s;
   const swap = cover && document.getElementById('cSwap').checked;
   if(sh===roleShift(mid,s) && !note && !cover) delete S.rotation.overrides[k];
   else S.rotation.overrides[k] = Object.assign({shift:sh, note}, cover?{cover}:{});
+  if(swap && isSatSwap(mid,s)){
+    // Sábado: turno único. Se cambia sábado por sábado: quien cubre trabaja este sábado y esta persona cubre el próximo sábado de quien cubre
+    const sat2 = nextWorkSaturday(cover, s);
+    S.rotation.overrides[k] = {shift:'Descanso', note, cover};
+    S.rotation.overrides[cover+'|'+s] = {shift:roleShift(mid,s), note, coverFor:mid};
+    if(sat2){ S.rotation.overrides[cover+'|'+sat2] = {shift:'Descanso', note, cover:mid};
+      S.rotation.overrides[mid+'|'+sat2] = {shift:roleShift(cover,sat2), note, coverFor:cover}; }
+    save(); closeModal(); render();
+    return toast(sat2 ? `${mName(mid).split(' ')[0]} cubrirá el sábado ${nice(sat2)}` : 'No encontré un próximo sábado para el intercambio');
+  }
   // Intercambio: a quien cubre le toca el turno original de esta persona y queda anotado quién lo cubre a él
   if(swap) S.rotation.overrides[cover+'|'+s] = {shift:roleShift(mid,s), note, cover:mid};
   save(); closeModal(); render();

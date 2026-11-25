@@ -66,6 +66,7 @@ Ver `database.rules.json`. Resumen: lectura para cualquier autenticado; `/contro
 - **Vista usuario:** el editor elige a una persona y ve toda la página como ella (`ui.asMember`, fuerza solo lectura; acciones de solicitudes bloqueadas). Banner amarillo para cambiar de persona o salir.
 - Festivos en Resumen: los que faltan del mes en curso; si no hay, el próximo. Cada uno con emoji temático (`holidayEmoji`).
 - Horarios: diseño minimalista (sin encabezados oscuros ni cuadrícula; columna Rol en gris; etiquetas suaves solo para Mañana/Mutante/Tarde/Home office; 🚨 = guardia; ✎ = cambio manual; 🏢 Presencial = días que el rol debe acudir a la oficina (`positions[].onsite`, Oficina 1 y 3 los viernes); columnas Rol · Ingeniero; tablas tituladas «Horario Colaboración» (rotación), «MM» y «Soporte Colaboración» (horario fijo excepto MM), en ese orden).
+- **Cambio manual con «Quién cubre»** (`overrides[k].cover` / `coverFor`): entre semana intercambia turnos el mismo día; en **sábado** (turno único) intercambia sábado por sábado: quien cubre trabaja este sábado y la persona cubre el próximo sábado de quien cubre (`isSatSwap`, `nextWorkSaturday`).
 - Vista móvil: barra de navegación inferior y calendario en lista.
 
 ## Flujo de trabajo para cambios
