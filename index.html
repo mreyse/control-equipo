@@ -786,19 +786,32 @@ function delegateOn(s){ return S.delegates.filter(d=>inRange(s,d.start,d.end)); 
 const defDel = () => S.settings.defaultDelegate || '';
 function absentOn(mid, s){ return S.vacations.some(v=>v.memberId===mid && v.status==='Aprobada' && !isHX(v) && inRange(s,v.start,v.end)); }
 // Días (de una ausencia del predeterminado) que no tienen delegado asignado
-function delegateGaps(v){ const out=[]; for(let d=pd(v.start); fd(d)<=v.end; d.setDate(d.getDate()+1)){ if(needsDelegate(fd(d)) && !delegateOn(fd(d)).length) out.push(fd(d)); } return out; }
+// Delegado efectivo de un día: el asignado que no esté ausente; si no, el predeterminado si no está ausente; si no, nadie (falta delegado)
+function effDelegate(s){ const a=delegateOn(s).find(d=>!absentOn(d.memberId,s)); if(a) return {id:a.memberId, src:'asignado'};
+  const dd=defDel(); if(dd && !absentOn(dd,s)) return {id:dd, src:'predeterminado'}; return null; }
+function isGapDay(s){ return needsDelegate(s) && !!defDel() && !effDelegate(s); }
+function gapDays(a, b){ const out=[]; for(let d=pd(a); fd(d)<=b; d.setDate(d.getDate()+1)) if(isGapDay(fd(d))) out.push(fd(d)); return out; }
+// Agrupa días sin delegado en rangos continuos (los fines de semana/festivos no rompen el rango)
+function gapRanges(a, b){ const out=[];
+  gapDays(a,b).forEach(s=>{ const last=out[out.length-1]; if(last && !gapsBetweenHasCover(last.end, s)) last.end=s; else out.push({start:s, end:s}); });
+  return out; }
+// ¿Entre dos fechas (exclusivo) hay algún día hábil que sí tiene delegado?
+function gapsBetweenHasCover(a, b){ const d=pd(a); d.setDate(d.getDate()+1); for(; fd(d)<b; d.setDate(d.getDate()+1)){ const x=fd(d); if(needsDelegate(x) && !isGapDay(x)) return true; } return false; }
+function delegateGaps(v){ return gapDays(v.start, v.end); }
+function gapReason(s){ const parts=[]; delegateOn(s).forEach(d=>{ if(absentOn(d.memberId,s)) parts.push(mName(d.memberId).split(' ')[0]+' (asignado)'); });
+  const dd=defDel(); if(dd && absentOn(dd,s)) parts.push(mName(dd).split(' ')[0]); return parts.length ? 'Ausentes: '+parts.join(', ') : ''; }
 // Solo días hábiles (lun–vie, sin festivo) requieren delegado
 function needsDelegate(s){ return dow(pd(s))<5 && !holidayOn(s); }
 // Al aprobar/registrar una ausencia del delegado predeterminado: abrir la ventana para asignar delegado en esas fechas
 function checkDelegateGap(v){
-  if(!v || !isEditor || v.status!=='Aprobada' || isHX(v) || !defDel() || v.memberId!==defDel()) return;
-  const g=delegateGaps(v); if(!g.length) return;
-  setTimeout(()=>delForm(null, {start:g[0], end:g[g.length-1], notes:'Ausencia de '+mName(v.memberId).split(' ')[0], warn:`${mName(v.memberId)} estará ausente (${v.type}) del ${nice(v.start)} al ${nice(v.end)}. ¿Quién queda como delegado?`}), 350);
+  if(!v || !isEditor || v.status!=='Aprobada' || isHX(v) || !defDel()) return;
+  const r=gapRanges(v.start, v.end)[0]; if(!r) return;
+  setTimeout(()=>openGapForm(r, `${mName(v.memberId)} estará ausente (${v.type}) del ${nice(v.start)} al ${nice(v.end)}.`), 350);
 }
 function delegates(){
   if(!isEditor) return '<div class="panel empty">Solo disponible para administradores.</div>';
   const t=todayS(), now=delegateOn(t), dd=defDel();
-  const gaps=S.vacations.filter(v=>dd && v.memberId===dd && v.status==='Aprobada' && !isHX(v) && v.end>=t && delegateGaps(v).length);
+  const gaps=pendingDelegateGaps();
   const up=S.delegates.filter(d=>d.end>=t).sort((a,b)=>a.start.localeCompare(b.start));
   const past=S.delegates.filter(d=>d.end<t).sort((a,b)=>b.start.localeCompare(a.start));
   const days=d=>Math.round((pd(d.end)-pd(d.start))/864e5)+1;
@@ -814,33 +827,33 @@ function delegates(){
     <div class="panel" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:28px">🧑‍💼</div>
       <div><div class="muted" style="font-size:12px">Delegado hoy</div>
-      ${now.length?now.map(d=>`<div style="font-size:18px;font-weight:600">${esc(mName(d.memberId))} <span class="muted" style="font-size:13px;font-weight:400">hasta el ${nice(d.end)}${d.notes?' · '+esc(d.notes):''}</span></div>`).join('')
-        : dd ? (absentOn(dd,t) ? `<div style="font-size:16px;color:var(--bad)">⚠ ${esc(mName(dd))} está ausente y no hay delegado asignado</div>` : `<div style="font-size:18px;font-weight:600">${esc(mName(dd))} <span class="muted" style="font-size:13px;font-weight:400">delegado predeterminado</span></div>`)
+      ${(()=>{ const e=effDelegate(t); return e&&e.src==='asignado'; })()?delegateOn(t).filter(d=>!absentOn(d.memberId,t)).map(d=>`<div style="font-size:18px;font-weight:600">${esc(mName(d.memberId))} <span class="muted" style="font-size:13px;font-weight:400">hasta el ${nice(d.end)}${d.notes?' · '+esc(d.notes):''}</span></div>`).join('')
+        : dd ? (!effDelegate(t) ? `<div style="font-size:16px;color:var(--bad)">⚠ ${esc(mName(dd))} está ausente y no hay delegado asignado</div>` : `<div style="font-size:18px;font-weight:600">${esc(mName(dd))} <span class="muted" style="font-size:13px;font-weight:400">delegado predeterminado</span></div>`)
         : '<div style="font-size:16px" class="muted">Nadie asignado para hoy</div>'}</div>
       <label style="margin-left:auto;font-size:13px" class="muted">Delegado predeterminado (cuando no hay nadie asignado)<br>
         <select onchange="S.settings.defaultDelegate=this.value;save();render()" style="margin-top:4px;min-width:220px"><option value="">— Ninguno —</option>${S.members.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(m=>`<option value="${m.id}" ${dd===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></label>
     </div>
     ${!dd?`<div class="alert warn" style="margin-bottom:14px">👉 Elige arriba a la derecha el <b>Delegado predeterminado</b>. Es quien queda como delegado cuando no hay nadie asignado; cuando tenga vacaciones, aquí aparecerán sus fechas para asignar a alguien más.</div>`:''}
-    ${gaps.length?`<div class="panel" style="border-left:4px solid var(--bad)"><h3>⚠ Ausencias de ${esc(mName(dd))} sin delegado</h3><table>${gaps.map(v=>{ const g=delegateGaps(v); return `<tr><td>${esc(v.type)}</td><td>${nice(v.start)} – ${nice(v.end)}</td><td class="muted">${g.length} ${g.length===1?'día':'días'} sin delegado</td><td style="text-align:right"><button class="btn sm" onclick="checkDelegateGapById('${v.id}')">Asignar delegado</button></td></tr>`; }).join('')}</table></div>`:''}
+    ${gaps.length?`<div class="panel" style="border-left:4px solid var(--bad)"><h3>⚠ Días sin delegado disponible</h3><table>${gaps.map(r=>{ const g=gapDays(r.start,r.end); return `<tr><td>${r.start===r.end?nice(r.start):nice(r.start)+' – '+nice(r.end)}</td><td class="muted">${g.length} ${g.length===1?'día hábil':'días hábiles'}</td><td class="muted" style="font-size:12px">${esc(gapReason(r.start))}</td><td style="text-align:right"><button class="btn sm" onclick="openGapForm({start:'${r.start}',end:'${r.end}'})">Asignar delegado</button></td></tr>`; }).join('')}</table></div>`:''}
     ${delegateCalendar()}
     <div class="panel"><h3>Asignaciones vigentes y próximas</h3>${up.length?`<table><tr><th>Delegado</th><th>Fechas</th><th>Duración</th><th>Notas</th><th></th></tr>${up.map(d=>row(d,false)).join('')}</table>`:'<div class="empty">No hay delegados asignados. Usa <b>+ Asignar delegado</b>.</div>'}</div>
     ${past.length?`<details class="panel"><summary style="cursor:pointer;font-weight:600">Historial (${past.length})</summary><table style="margin-top:8px">${past.map(d=>row(d,true)).join('')}</table></details>`:''}`;
 }
 // Ausencias futuras del delegado predeterminado que aún no tienen delegado (solo administradores)
-function pendingDelegateGaps(){ const dd=defDel(), t=todayS(); if(!isEditor || !dd) return [];
-  return S.vacations.filter(v=>v.memberId===dd && v.status==='Aprobada' && !isHX(v) && v.end>=t && delegateGaps(v).length).sort((a,b)=>a.start.localeCompare(b.start)); }
+function pendingDelegateGaps(){ if(!isEditor || !defDel()) return []; const t=todayS(), e=new Date(); e.setDate(e.getDate()+365); return gapRanges(t, fd(e)); }
 function delegateBanner(){ const g=pendingDelegateGaps(); if(!g.length) return '';
-  return `<div class="alert warn" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">🧑‍💼 <span><b>${esc(mName(defDel()))}</b> estará ausente sin delegado asignado: ${g.map(v=>`${nice(v.start)} – ${nice(v.end)}`).join(' · ')}</span>
-    <button class="btn sm" style="margin-left:auto" onclick="checkDelegateGapById('${g[0].id}')">Asignar delegado</button></div>`; }
+  return `<div class="alert warn" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">🧑‍💼 <span>Días sin delegado disponible: ${g.map(r=>r.start===r.end?nice(r.start):`${nice(r.start)} – ${nice(r.end)}`).join(' · ')}</span>
+    <button class="btn sm" style="margin-left:auto" onclick="openGapForm({start:'${g[0].start}',end:'${g[0].end}'})">Asignar delegado</button></div>`; }
 // Una vez por sesión, al entrar un administrador, abrir la ventana si hay ausencias del predeterminado sin delegado
 let delegatePromptShown = false;
 function maybePromptDelegate(){ if(delegatePromptShown || ui.asMember || !dbRef || !lastRemote || document.getElementById('modalBg').classList.contains('show')) return;
-  const g=pendingDelegateGaps(); if(!g.length) return; delegatePromptShown=true; checkDelegateGap(g[0]); }
+  const g=pendingDelegateGaps(); if(!g.length) return; delegatePromptShown=true; openGapForm(g[0]); }
 // Calendario de delegados: solo las semanas (de hoy en adelante) con vacaciones del predeterminado o con delegado asignado.
 // En cada día solo aparece el delegado asignado; si el predeterminado está ausente y falta asignar, «⚠ Sin delegado».
 function delegateCalendar(){
   const t=todayS(), dd=defDel(), mon=mondayOf(t);
-  const relevant=[...S.delegates.filter(d=>d.end>=t).map(d=>[d.start,d.end]),
+  const e365=new Date(); e365.setDate(e365.getDate()+365);
+  const relevant=[...S.delegates.filter(d=>d.end>=t).map(d=>[d.start,d.end]), ...pendingDelegateGaps().map(r=>[r.start,r.end]),
     ...(dd?S.vacations.filter(v=>v.memberId===dd && v.status==='Aprobada' && !isHX(v) && v.end>=t).map(v=>[v.start,v.end]):[])];
   const weeks=new Set();
   relevant.forEach(([a,b])=>{ for(let d=pd(mondayOf(a>t?a:t)); fd(d)<=b; d.setDate(d.getDate()+7)) weeks.add(fd(d)); });
@@ -849,8 +862,8 @@ function delegateCalendar(){
   const rows=list.map(w=>{ const a=pd(w), e=new Date(a); e.setDate(a.getDate()+6);
     const cells=[...Array(7)].map((_,i)=>{ const d=new Date(a); d.setDate(a.getDate()+i); const s=fd(d), as=delegateOn(s);
       let body='';
-      if(as.length) body=as.map(x=>`<div class="dlc-n">💂 <b>${esc(mName(x.memberId).split(' ')[0])}</b></div>`).join('');
-      else if(dd && absentOn(dd,s) && needsDelegate(s)) body=`<div class="dlc-n" style="color:var(--bad)">⚠ Sin delegado</div>`;
+      body=as.map(x=>absentOn(x.memberId,s)?`<div class="dlc-n muted" style="text-decoration:line-through">💂 ${esc(mName(x.memberId).split(' ')[0])}</div>`:`<div class="dlc-n">💂 <b>${esc(mName(x.memberId).split(' ')[0])}</b></div>`).join('');
+      if(isGapDay(s)) body+=`<div class="dlc-n" style="color:var(--bad)" title="${esc(gapReason(s))}">⚠ Sin delegado</div>`;
       const vac = dd && absentOn(dd,s);
       return `<div class="dlc ${s===t?'today':''} ${i>=5?'wk':''} ${s<t?'out':''}" ${vac?'style="background:#eef0f3"':''} onclick="delForm(null,{start:'${s}',end:'${s}'})" title="${vac?esc(mName(dd))+' de vacaciones · ':''}Clic para asignar delegado este día"><div class="dlc-d">${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'][i]} ${d.getDate()}${vac?' 🌴':''}</div>${body}</div>`; }).join('');
     return `<div class="dlwk"><div class="dlwk-t">${nice(fd(a)).replace(/ \d{4}$/,'')} – ${nice(fd(e))}</div><div class="dlcal">${cells}</div></div>`; }).join('');
@@ -858,6 +871,8 @@ function delegateCalendar(){
     <p class="muted" style="font-size:12px;margin:8px 0 0">🌴 y fondo gris = ${dd?esc(mName(dd).split(' ')[0])+' de vacaciones':'vacaciones'} · 💂 <b>nombre</b> = delegado ese día · <span style="color:var(--bad)">⚠ Sin delegado</span> = falta asignar. Clic en un día para asignar.</p></div>`;
 }
 function checkDelegateGapById(id){ const v=S.vacations.find(x=>x.id===id); if(v) checkDelegateGap(v); }
+function openGapForm(r, intro){ const days=gapDays(r.start, r.end);
+  delForm(null, {start:r.start, end:r.end, notes:'', warn:`${intro?intro+' ':''}No hay delegado disponible ${r.start===r.end?'el '+nice(r.start):'del '+nice(r.start)+' al '+nice(r.end)} (${days.length} ${days.length===1?'día hábil':'días hábiles'}). ${gapReason(r.start)}. ¿Quién queda como delegado?`}); }
 function delForm(id, preset){
   const t=todayS(), mon=mondayOf(t), sun=(()=>{ const d=pd(mon); d.setDate(d.getDate()+6); return fd(d); })();
   const d = id ? S.delegates.find(x=>x.id===id) : Object.assign({memberId:'', start:mon, end:sun, notes:''}, preset||{});
@@ -881,6 +896,8 @@ function delSave(id){
   const memberId=val('dlM'), start=val('dlS'), end=val('dlE'), notes=val('dlN').trim();
   if(!memberId || !start || !end) return toast('Falta el delegado o las fechas');
   if(end<start) return toast('La fecha final es antes de la inicial');
+  const away=[]; for(let d=pd(start); fd(d)<=end; d.setDate(d.getDate()+1)) if(needsDelegate(fd(d)) && absentOn(memberId, fd(d))) away.push(nice(fd(d)));
+  if(away.length && !confirm(`${mName(memberId)} también está ausente: ${away.slice(0,5).join(', ')}${away.length>5?'…':''}. ¿Asignarlo de todos modos?`)) return;
   const clash=S.delegates.find(x=>x.id!==id && x.start<=end && x.end>=start);
   if(clash && !confirm(`${mName(clash.memberId)} ya es delegado del ${nice(clash.start)} al ${nice(clash.end)}. ¿Guardar de todos modos?`)) return;
   if(id) Object.assign(S.delegates.find(x=>x.id===id), {memberId,start,end,notes});
