@@ -283,7 +283,7 @@ table.mh .today{background:#f6f9ff}
 table.mh td.off{color:#b5bccb}
 table.mh td.hol{color:#a32d2d}
 table.mh td.fixedh{color:#555d6e}
-.mnrow{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0;border-bottom:1px solid #f0f2f6}.mnrow:last-child{border-bottom:0}table.mh .hxn{font-size:11px;color:#8a5a00;margin-top:2px;white-space:nowrap}table.mh .covn2{color:#4a5568;white-space:normal;line-height:1.25}.hchip{background:#eef1f6;color:#3d4452;border-radius:999px;padding:3px 10px;font-size:12px}.mnrow.mnhead{font-size:11px;color:var(--muted,#8a93a3);padding:0 0 2px}
+.mnrow{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0;border-bottom:1px solid #f0f2f6}.mnrow:last-child{border-bottom:0}.dlgrid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px}.dlw{border:1px solid #eef0f4;border-radius:8px;padding:8px}.dlw.cur{border-color:var(--accent);background:#f5f8ff}.dln{font-size:13px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}@media(max-width:900px){.dlgrid{grid-template-columns:repeat(2,1fr)}}table.mh .hxn{font-size:11px;color:#8a5a00;margin-top:2px;white-space:nowrap}table.mh .covn2{color:#4a5568;white-space:normal;line-height:1.25}.hchip{background:#eef1f6;color:#3d4452;border-radius:999px;padding:3px 10px;font-size:12px}.mnrow.mnhead{font-size:11px;color:var(--muted,#8a93a3);padding:0 0 2px}
 table.mh td.rolec{color:var(--muted);font-size:12px}
 table.mh td.hrs{color:var(--muted);text-align:right}
 table.mh .mrole{display:none}
@@ -312,6 +312,7 @@ table.mh .mrole{display:none}
     <button class="nav" data-view="overtime" data-s="Horas extras">⏱️ <span class="t">Horas extras</span></button>
     <button class="nav" data-view="calendar" data-s="Calendario">📅 <span class="t">Calendario</span></button>
     <button class="nav" data-view="team" data-s="Equipo">👥 <span class="t">Equipo</span></button>
+    <button class="nav edit-only" data-view="delegates" data-s="Delegados">🧑‍💼 <span class="t">Delegados</span></button>
     <button class="nav edit-only" data-view="userview" data-s="Vista usuario">👁 <span class="t">Vista usuario</span></button>
     <button class="nav" data-view="settings" data-s="Ajustes">⚙️ <span class="t">Ajustes</span></button>
     <div class="spacer"></div>
@@ -381,7 +382,7 @@ function hydrate(d){
   const b = blank();
   const x = Object.assign(b, d, {settings:Object.assign(b.settings, d.settings||{}), rotation:Object.assign(blank().rotation, d.rotation||{})});
   x.members = toArr(x.members).map(m=>Object.assign({}, m, {fixed: m.fixed ? Object.assign({}, m.fixed, {days: toArr(m.fixed.days)}) : null}));
-  x.oncall = toArr(x.oncall); x.vacations = toArr(x.vacations); x.holidays = toArr(x.holidays); x.notices = toArr(x.notices);
+  x.oncall = toArr(x.oncall); x.vacations = toArr(x.vacations); x.holidays = toArr(x.holidays); x.notices = toArr(x.notices); x.delegates = toArr(x.delegates);
   const R = x.rotation;
   R.order = toArr(R.order); R.breaks = toArr(R.breaks); R.overrides = R.overrides || {};
   R.positions = toArr(R.positions).map(p=>Object.assign({}, p, {days: toArr(p.days), onsite: toArr(p.onsite)}));
@@ -774,9 +775,67 @@ function reqAct(id, action){
 function renderBadge(){ const n = S.vacations.filter(v=>v.status==='Pendiente').length + (isEditor ? reqList().filter(reqNeedsAdmin).length : reqList().filter(reqIncoming).length); const b=document.getElementById('pendBadge'); b.textContent=n; b.classList.toggle('hidden', !n); }
 function isMobile(){ return window.matchMedia('(max-width:700px)').matches; }
 window.matchMedia('(max-width:700px)').addEventListener('change', ()=>render());
-function render(){ const f = {dashboard,calendar,vacations,oncall,overtime,schedules,team,settings,userview}[ui.view] || dashboard; document.getElementById('main').innerHTML = asBanner() + f(); renderBadge();
+function render(){ const f = {dashboard,calendar,vacations,oncall,overtime,schedules,team,settings,userview,delegates}[ui.view] || dashboard; document.getElementById('main').innerHTML = asBanner() + f(); renderBadge();
   if(dbRef && !isEditor) document.querySelectorAll('#main [onchange*="S."],#main [oninput*="S."]').forEach(el=>{ el.disabled=true; el.removeAttribute('onchange'); el.removeAttribute('oninput'); });
 }
+
+/* ================== Vista: Delegados (solo administradores) ================== */
+// S.delegates = [{id, memberId, start, end, notes}] — quién queda como delegado del área en esas fechas
+function delegateOn(s){ return S.delegates.filter(d=>inRange(s,d.start,d.end)); }
+function delegates(){
+  if(!isEditor) return '<div class="panel empty">Solo disponible para administradores.</div>';
+  const t=todayS(), now=delegateOn(t);
+  const up=S.delegates.filter(d=>d.end>=t).sort((a,b)=>a.start.localeCompare(b.start));
+  const past=S.delegates.filter(d=>d.end<t).sort((a,b)=>b.start.localeCompare(a.start));
+  const days=d=>Math.round((pd(d.end)-pd(d.start))/864e5)+1;
+  const row=(d,dim)=>`<tr ${dim?'style="opacity:.65"':''}><td><span class="dot" style="background:${mColor(d.memberId)}"></span><b>${esc(mName(d.memberId))}</b></td><td>${nice(d.start)} – ${nice(d.end)}</td><td class="muted">${days(d)} ${days(d)===1?'día':'días'}</td><td class="muted" style="font-size:12px">${esc(d.notes||'')}</td>
+    <td style="text-align:right;white-space:nowrap"><button class="btn sec sm" onclick="delForm('${d.id}')">Editar</button> <button class="btn sec sm" onclick="delDel('${d.id}')">🗑</button></td></tr>`;
+  // Próximas 8 semanas: quién está como delegado cada semana
+  const mon=mondayOf(t), weeks=[...Array(8)].map((_,i)=>{ const a=pd(mon); a.setDate(a.getDate()+7*i); const b=new Date(a); b.setDate(a.getDate()+6); return [fd(a),fd(b)]; });
+  const wk = weeks.map(([a,b])=>{ const ds=S.delegates.filter(d=>d.start<=b && d.end>=a);
+    return `<div class="dlw ${a===mon?'cur':''}"><div class="muted" style="font-size:11px">${a===mon?'Esta semana':nice(a).replace(/ \d{4}$/,'')}</div>
+      ${ds.length?ds.map(d=>`<div class="dln"><span class="dot" style="background:${mColor(d.memberId)}"></span>${esc(mName(d.memberId).split(' ')[0])}${d.start>a||d.end<b?` <span class="muted" style="font-size:11px">(${pd(d.start>a?d.start:a).getDate()}–${pd(d.end<b?d.end:b).getDate()})</span>`:''}</div>`).join(''):'<div class="muted" style="font-size:12px">—</div>'}</div>`; }).join('');
+  return `<div class="head"><h2>Delegados del área</h2><div class="toolbar"><button class="btn" onclick="delForm()">+ Asignar delegado</button></div></div>
+    <div class="panel" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="font-size:28px">🧑‍💼</div>
+      <div><div class="muted" style="font-size:12px">Delegado hoy</div>
+      ${now.length?now.map(d=>`<div style="font-size:18px;font-weight:600">${esc(mName(d.memberId))} <span class="muted" style="font-size:13px;font-weight:400">hasta el ${nice(d.end)}${d.notes?' · '+esc(d.notes):''}</span></div>`).join(''):'<div style="font-size:16px" class="muted">Nadie asignado para hoy</div>'}</div>
+    </div>
+    <div class="panel"><h3>Próximas semanas</h3><div class="dlgrid">${wk}</div></div>
+    <div class="panel"><h3>Asignaciones vigentes y próximas</h3>${up.length?`<table><tr><th>Delegado</th><th>Fechas</th><th>Duración</th><th>Notas</th><th></th></tr>${up.map(d=>row(d,false)).join('')}</table>`:'<div class="empty">No hay delegados asignados. Usa <b>+ Asignar delegado</b>.</div>'}</div>
+    ${past.length?`<details class="panel"><summary style="cursor:pointer;font-weight:600">Historial (${past.length})</summary><table style="margin-top:8px">${past.map(d=>row(d,true)).join('')}</table></details>`:''}`;
+}
+function delForm(id){
+  const t=todayS(), mon=mondayOf(t), sun=(()=>{ const d=pd(mon); d.setDate(d.getDate()+6); return fd(d); })();
+  const d = id ? S.delegates.find(x=>x.id===id) : {memberId:'', start:mon, end:sun, notes:''};
+  if(!d) return;
+  openModal(`<h3>${id?'Editar':'Asignar'} delegado</h3>
+    <div class="form">
+      <label class="f full">Delegado<select id="dlM">${S.members.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(m=>`<option value="${m.id}" ${d.memberId===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></label>
+      <label class="f">Desde<input type="date" id="dlS" value="${d.start}"></label>
+      <label class="f">Hasta<input type="date" id="dlE" value="${d.end}"></label>
+      <div class="f full" style="flex-direction:row;gap:6px;flex-wrap:wrap"><span class="muted" style="font-size:12px;align-self:center">Rápido:</span>
+        <button type="button" class="btn sec sm" onclick="delQuick(0)">Esta semana</button><button type="button" class="btn sec sm" onclick="delQuick(1)">Próxima semana</button><button type="button" class="btn sec sm" onclick="delQuick(-1)">Solo hoy</button></div>
+      <label class="f full">Notas<input id="dlN" value="${esc(d.notes||'')}" placeholder="Ej. vacaciones del gerente, viaje, junta…"></label>
+    </div>
+    <div style="text-align:right;margin-top:12px"><button class="btn sec" onclick="closeModal()">Cancelar</button> <button class="btn" onclick="delSave('${id||''}')">Guardar</button></div>`);
+}
+function delQuick(w){ const t=todayS(); if(w<0){ document.getElementById('dlS').value=t; document.getElementById('dlE').value=t; return; }
+  const a=pd(mondayOf(t)); a.setDate(a.getDate()+7*w); const b=new Date(a); b.setDate(a.getDate()+6);
+  document.getElementById('dlS').value=fd(a); document.getElementById('dlE').value=fd(b); }
+function delSave(id){
+  const memberId=val('dlM'), start=val('dlS'), end=val('dlE'), notes=val('dlN').trim();
+  if(!memberId || !start || !end) return toast('Falta el delegado o las fechas');
+  if(end<start) return toast('La fecha final es antes de la inicial');
+  const clash=S.delegates.find(x=>x.id!==id && x.start<=end && x.end>=start);
+  if(clash && !confirm(`${mName(clash.memberId)} ya es delegado del ${nice(clash.start)} al ${nice(clash.end)}. ¿Guardar de todos modos?`)) return;
+  if(id) Object.assign(S.delegates.find(x=>x.id===id), {memberId,start,end,notes});
+  else S.delegates.push({id:uid(), memberId, start, end, notes});
+  save(); closeModal(); toast('Guardado'); render();
+}
+function delDel(id){ const d=S.delegates.find(x=>x.id===id); if(!d) return;
+  if(!confirm(`¿Quitar a ${mName(d.memberId)} como delegado (${nice(d.start)} – ${nice(d.end)})?`)) return;
+  S.delegates=S.delegates.filter(x=>x.id!==id); save(); render(); }
 
 /* ================== Vista: Horas extras ================== */
 // Cálculo de horas: lo trabajado entre 00:00 y 06:00 vale triple. Ej. 23:00–02:00 = 1 h normal + 2 h × 3 = 7 h
