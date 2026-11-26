@@ -37,7 +37,7 @@ Ver `database.rules.json`. Resumen: lectura para cualquier autenticado; `/contro
 - `settings`: `{maxOff, defaultDays:18, guardPhones:{Colaboración,MM}, mail:{enabled,fromName,replyTo}}`
 - `notices[]` (avisos): `{id,icon,text(**negritas**),date?,dateEnd?,tStart?,tEnd?,from?,to?,createdAt}` — se muestran en Resumen y en el correo semanal.
 - `members[].mail` (bool): recibe el correo semanal (apagado por defecto; el propietario decide a quién).
-- `/overtime/{id}`: `{uid,email(minúsculas),memberId,name,report,date,start,end,hours,notes,uses:[{hours,date}],createdAt}` — Horas extras: total por hora inicio/fin (cruza medianoche), «🔁 Cambiar» registra horas usadas y fecha; estados Disponible / Parcial / Cambiada. Admin: filtro por persona, «Saldo por persona», CSV.
+- `/overtime/{id}`: `{uid,email(minúsculas),memberId,name,report,date,start,end,hours,notes,uses:[{hours,date}],createdAt}` — Horas extras: total por hora inicio/fin (cruza medianoche); **lo trabajado entre 00:00 y 06:00 cuenta ×3** (`otCalc` → real, night, total; `otH(o)` recalcula desde inicio/fin), «🔁 Cambiar» registra horas usadas y fecha; estados Disponible / Parcial / Cambiada. Admin: filtro por persona, «Saldo por persona», CSV.
 - `/requests`: `kind` = `vac` | `swap` (turno) | `gswap` (guardia); estados: `Pendiente`, `Esperando compañero`, `Por aprobar`, `Aprobada`, `Rechazada`, `Cancelada`.
 
 ## Reglas de negocio

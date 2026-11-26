@@ -777,9 +777,19 @@ function render(){ const f = {dashboard,calendar,vacations,oncall,overtime,sched
 }
 
 /* ================== Vista: Horas extras ================== */
+// Cálculo de horas: lo trabajado entre 00:00 y 06:00 vale triple. Ej. 23:00–02:00 = 1 h normal + 2 h × 3 = 7 h
+function otCalc(a, b){
+  if(!a || !b) return {real:0, night:0, total:0};
+  const [h1,m1]=a.split(':').map(Number), [h2,m2]=b.split(':').map(Number);
+  let s=h1*60+m1, e=h2*60+m2; if(e<=s) e+=1440;
+  let night=0; for(let t=s; t<e; t++){ if(t%1440 < 360) night++; }
+  const real=(e-s)/60, n=night/60, r2=x=>Math.round(x*100)/100;
+  return {real:r2(real), night:r2(n), total:r2(real - n + n*3)};
+}
+const otH = o => (o.start && o.end) ? otCalc(o.start,o.end).total : (+o.hours||0);
 const otList = () => Object.entries(overtimeData||{}).map(([id,o])=>({id,...o, uses: toArr(o.uses)}));
 const otUsed = o => (o.uses||[]).reduce((a,u)=>a+(+u.hours||0),0);
-const otLeft = o => Math.max(0, Math.round(((+o.hours||0) - otUsed(o))*100)/100);
+const otLeft = o => Math.max(0, Math.round((otH(o) - otUsed(o))*100)/100);
 const fmtOT = h => (Math.round(h*100)/100).toString();
 function otStatus(o){ const u=otUsed(o), l=otLeft(o);
   if(!u) return '<span class="pill Aprobada">Disponible</span>';
@@ -795,13 +805,13 @@ function overtime(){
   const canWrite = !ui.asMember && !!fbUser;
   const list = otList().filter(otScope()).filter(o=>ui.otShow!=='disp' || otLeft(o)>0).sort((a,b)=>(b.date||'').localeCompare(a.date||'') || (b.start||'').localeCompare(a.start||''));
   const scopeAll = otList().filter(otScope());
-  const tot = scopeAll.reduce((a,o)=>a+(+o.hours||0),0), used = scopeAll.reduce((a,o)=>a+otUsed(o),0);
+  const tot = scopeAll.reduce((a,o)=>a+otH(o),0), used = scopeAll.reduce((a,o)=>a+otUsed(o),0);
   const admin = isEditor && !ui.asMember;
   const who = o => { const m=member(o.memberId); return m ? `<span class="dot" style="background:${m.color}"></span>${esc(m.name)}` : esc(o.name||o.email||''); };
   // Resumen por persona (solo administradores, sin filtro)
   let perPerson = '';
   if(admin && !ui.otMember){
-    const by={}; otList().forEach(o=>{ const k=o.memberId||o.email; (by[k] ||= {o, tot:0, used:0}); by[k].tot+=(+o.hours||0); by[k].used+=otUsed(o); });
+    const by={}; otList().forEach(o=>{ const k=o.memberId||o.email; (by[k] ||= {o, tot:0, used:0}); by[k].tot+=otH(o); by[k].used+=otUsed(o); });
     const rows=Object.values(by).sort((a,b)=>(b.tot-b.used)-(a.tot-a.used));
     perPerson = rows.length?`<div class="panel"><h3>Saldo por persona</h3><table><tr><th>Integrante</th><th>Registradas</th><th>Cambiadas</th><th>Disponibles</th><th></th></tr>
       ${rows.map(r=>`<tr><td>${who(r.o)}</td><td>${fmtOT(r.tot)} h</td><td>${fmtOT(r.used)} h</td><td><b>${fmtOT(r.tot-r.used)} h</b></td><td style="text-align:right"><button class="btn sec sm" onclick="ui.otMember='${r.o.memberId||''}';render()">Ver</button></td></tr>`).join('')}</table></div>`:'';
@@ -820,12 +830,12 @@ function overtime(){
     ${perPerson}
     <div class="panel">${list.length?`<table><tr>${admin&&!ui.otMember?'<th>Integrante</th>':''}<th>Reporte</th><th>Fecha</th><th>Horario</th><th>Horas</th><th>Estado</th><th>Cambiadas</th><th>Comentarios</th><th></th></tr>
       ${list.map(o=>{ const mine = fbUser && (o.email||'').toLowerCase()===(fbUser.email||'').toLowerCase(); const can = canWrite && (admin || mine);
-        return `<tr>${admin&&!ui.otMember?`<td>${who(o)}</td>`:''}<td>${esc(o.report||'—')}</td><td>${nice(o.date)}</td><td class="muted">${esc(o.start)}–${esc(o.end)}</td><td><b>${fmtOT(+o.hours||0)} h</b></td><td>${otStatus(o)}</td>
+        return `<tr>${admin&&!ui.otMember?`<td>${who(o)}</td>`:''}<td>${esc(o.report||'—')}</td><td>${nice(o.date)}</td><td class="muted">${esc(o.start)}–${esc(o.end)}</td><td><b>${fmtOT(otH(o))} h</b>${otCalc(o.start,o.end).night?`<br><span class="muted" style="font-size:11px" title="Entre 00:00 y 06:00 vale triple">🌙 ${fmtOT(otCalc(o.start,o.end).night)} h × 3</span>`:''}</td><td>${otStatus(o)}</td>
         <td class="muted" style="font-size:12px">${(o.uses||[]).map(u=>`${fmtOT(+u.hours)} h · ${nice(u.date)}`).join('<br>')||'—'}</td>
         <td class="muted" style="font-size:12px;max-width:240px">${esc(o.notes||'')}</td>
         <td style="text-align:right;white-space:nowrap">${can?`${otLeft(o)>0?`<button class="btn sec sm" onclick="otUseForm('${o.id}')" title="Registrar que cambiaste estas horas">🔁 Cambiar</button> `:''}<button class="btn sec sm" onclick="otForm('${o.id}')">Editar</button> <button class="btn sec sm" onclick="otDel('${o.id}')" title="Eliminar">🗑</button>`:''}</td></tr>`; }).join('')}</table>`
       :`<div class="empty">${canWrite?'Aún no hay horas extras registradas. Usa <b>+ Registrar horas</b> para agregar las primeras.':'Sin horas extras registradas.'}</div>`}</div>
-    <p class="muted" style="font-size:12px">Las horas se calculan solas con la hora de inicio y fin (si terminas después de medianoche, se toma el día siguiente). Cuando uses horas, da clic en <b>🔁 Cambiar</b> e indica cuántas y en qué fecha.</p>`;
+    <p class="muted" style="font-size:12px">Las horas se calculan solas con la hora de inicio y fin (si terminas después de medianoche, se toma el día siguiente). Lo trabajado entre 00:00 y 06:00 cuenta triple. Cuando uses horas, da clic en <b>🔁 Cambiar</b> e indica cuántas y en qué fecha.</p>`;
 }
 function otForm(id){
   const o = id ? otList().find(x=>x.id===id) : {report:'', date:todayS(), start:'', end:'', notes:''};
@@ -845,19 +855,22 @@ function otForm(id){
   otPreview();
 }
 function otPreview(){ const a=val('otS'), b=val('otE'), el=document.getElementById('otP'); if(!el) return;
-  el.innerHTML = a&&b ? `Total: <b>${fmtOT(hoursBetween(a,b))} h</b>${b<=a?' <span class="muted">(termina al día siguiente)</span>':''}` : '<span class="muted">Escribe la hora de inicio y final para calcular el total.</span>'; }
+  if(!(a&&b)) return el.innerHTML = '<span class="muted">Escribe la hora de inicio y final para calcular el total.</span>';
+  const c=otCalc(a,b);
+  el.innerHTML = `Total a registrar: <b>${fmtOT(c.total)} h</b>${b<=a?' <span class="muted">(termina al día siguiente)</span>':''}`
+    + (c.night ? `<div class="muted" style="font-size:12px;margin-top:2px">${fmtOT(c.real-c.night)} h normales + 🌙 ${fmtOT(c.night)} h entre 00:00 y 06:00 × 3 = ${fmtOT(c.night*3)} h</div>` : ''); }
 function otSave(id){
   const start=val('otS'), end=val('otE'), date=val('otD');
   if(!date || !start || !end) return toast('Falta la fecha o las horas');
-  const hours = Math.round(hoursBetween(start,end)*100)/100;
+  const calc = otCalc(start,end), hours = calc.total;
   if(!hours) return toast('La hora final debe ser distinta a la de inicio');
   const ref = firebase.database().ref('overtime');
   if(id){ const o=otList().find(x=>x.id===id); if(hours < otUsed(o)) return toast('No puede ser menor a las horas ya cambiadas');
-    return ref.child(id).update({report:val('otR').trim(), date, start, end, hours, notes:val('otN').trim()}).then(()=>{ closeModal(); toast('Guardado'); }).catch(e=>toast('No se pudo guardar: '+e.message)); }
+    return ref.child(id).update({report:val('otR').trim(), date, start, end, hours, realHours:calc.real, nightHours:calc.night, notes:val('otN').trim()}).then(()=>{ closeModal(); toast('Guardado'); }).catch(e=>toast('No se pudo guardar: '+e.message)); }
   const forId = document.getElementById('otM') ? val('otM') : '';
   const m = forId ? member(forId) : myMember();
   const rec = {uid: forId ? '' : fbUser.uid, email: (forId ? (m.email||'') : fbUser.email).toLowerCase(), memberId: m?.id||'', name: m?.name||fbUser.email,
-    report:val('otR').trim(), date, start, end, hours, notes:val('otN').trim(), createdAt: new Date().toISOString()};
+    report:val('otR').trim(), date, start, end, hours, realHours:calc.real, nightHours:calc.night, notes:val('otN').trim(), createdAt: new Date().toISOString()};
   ref.push(rec).then(()=>{ closeModal(); toast('Horas registradas'); }).catch(e=>toast('No se pudo guardar: '+e.message));
 }
 function otUseForm(id){
@@ -880,8 +893,8 @@ function otDel(id){
 }
 function otCSV(){
   const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
-  const rows=[['Integrante','Reporte','Fecha','Hora Inicio','Hora Final','Horas totales','Cambiadas','Fecha utilizadas','Disponibles','Comentarios']];
-  otList().filter(otScope()).sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(o=>rows.push([member(o.memberId)?.name||o.name||o.email, o.report, o.date, o.start, o.end, o.hours, otUsed(o), (o.uses||[]).map(u=>u.date).join(' / '), otLeft(o), o.notes]));
+  const rows=[['Integrante','Reporte','Fecha','Hora Inicio','Hora Final','Horas reales','Horas 00-06 (x3)','Horas totales','Cambiadas','Fecha utilizadas','Disponibles','Comentarios']];
+  otList().filter(otScope()).sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(o=>rows.push([member(o.memberId)?.name||o.name||o.email, o.report, o.date, o.start, o.end, otCalc(o.start,o.end).real, otCalc(o.start,o.end).night, otH(o), otUsed(o), (o.uses||[]).map(u=>u.date).join(' / '), otLeft(o), o.notes]));
   download(`horas-extras-${todayS()}.csv`, '\ufeff'+rows.map(r=>r.map(q).join(',')).join('\r\n'), 'text/csv;charset=utf-8');
 }
 
