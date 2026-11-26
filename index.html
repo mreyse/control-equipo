@@ -823,6 +823,16 @@ function delegates(){
     <div class="panel"><h3>Asignaciones vigentes y próximas</h3>${up.length?`<table><tr><th>Delegado</th><th>Fechas</th><th>Duración</th><th>Notas</th><th></th></tr>${up.map(d=>row(d,false)).join('')}</table>`:'<div class="empty">No hay delegados asignados. Usa <b>+ Asignar delegado</b>.</div>'}</div>
     ${past.length?`<details class="panel"><summary style="cursor:pointer;font-weight:600">Historial (${past.length})</summary><table style="margin-top:8px">${past.map(d=>row(d,true)).join('')}</table></details>`:''}`;
 }
+// Ausencias futuras del delegado predeterminado que aún no tienen delegado (solo administradores)
+function pendingDelegateGaps(){ const dd=defDel(), t=todayS(); if(!isEditor || !dd) return [];
+  return S.vacations.filter(v=>v.memberId===dd && v.status==='Aprobada' && !isHX(v) && v.end>=t && delegateGaps(v).length).sort((a,b)=>a.start.localeCompare(b.start)); }
+function delegateBanner(){ const g=pendingDelegateGaps(); if(!g.length) return '';
+  return `<div class="alert warn" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">🧑‍💼 <span><b>${esc(mName(defDel()))}</b> estará ausente sin delegado asignado: ${g.map(v=>`${nice(v.start)} – ${nice(v.end)}`).join(' · ')}</span>
+    <button class="btn sm" style="margin-left:auto" onclick="checkDelegateGapById('${g[0].id}')">Asignar delegado</button></div>`; }
+// Una vez por sesión, al entrar un administrador, abrir la ventana si hay ausencias del predeterminado sin delegado
+let delegatePromptShown = false;
+function maybePromptDelegate(){ if(delegatePromptShown || ui.asMember || !dbRef || !lastRemote || document.getElementById('modalBg').classList.contains('show')) return;
+  const g=pendingDelegateGaps(); if(!g.length) return; delegatePromptShown=true; checkDelegateGap(g[0]); }
 function checkDelegateGapById(id){ const v=S.vacations.find(x=>x.id===id); if(v) checkDelegateGap(v); }
 function delForm(id, preset){
   const t=todayS(), mon=mondayOf(t), sun=(()=>{ const d=pd(mon); d.setDate(d.getDate()+6); return fd(d); })();
@@ -1232,6 +1242,7 @@ function dashboard(){
     <button class="btn" onclick="vacForm()">+ Solicitud de vacaciones</button>
     <button class="btn sec" onclick="gdForm()">+ Guardia</button></div></div>
   ${needTeam()}
+  ${delegateBanner()}
   <div class="grid4">
     <div class="kpi"><div class="l" style="margin-bottom:6px">🚨 De guardia hoy</div>${['Colaboración','MM'].map(team=>{ const g=gdToday.find(x=>(x.team||'Colaboración')===team); return `<div class="gtoday"><div><span class="dot" style="background:${g?mColor(g.memberId):'#ccc'}"></span><b>${g?esc(mName(g.memberId)):'<span class="muted">Sin asignar</span>'}</b> <span class="muted" style="font-size:12px">${team}</span></div>${phoneLink(team)}</div>`; }).join('')}</div>
     <div class="kpi"><div class="n">${offToday.length}</div><div class="l">Ausentes hoy</div>${offToday.length?`<div style="margin-top:6px;font-size:13px">${offToday.map(v=>`<div><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))} <span class="muted" style="font-size:11px">(${esc(v.type)}${v.end>t?` · hasta ${nice(v.end)}`:''})</span></div>`).join('')}</div>`:''}</div>
@@ -2037,11 +2048,12 @@ function resetPass(){
     reqRef = firebase.database().ref('requests');
     reqRef.on('value', snap=>{ requests = snap.val()||{}; render(); }, ()=>{ requests={}; });
     edRef = firebase.database().ref('editors');
-    edRef.on('value', snap=>{ editors = snap.val()||{}; const was=isEditor; applyRole(); subOvertime(user); if(was!==isEditor || ui.view==='settings') render(); }, ()=>{ editors={}; applyRole(); subOvertime(user); });
+    edRef.on('value', snap=>{ editors = snap.val()||{}; const was=isEditor; applyRole(); subOvertime(user); if(was!==isEditor || ui.view==='settings') render(); setTimeout(maybePromptDelegate, 800); }, ()=>{ editors={}; applyRole(); subOvertime(user); });
     dbRef = firebase.database().ref(DB_PATH);
     dbRef.on('value', snap=>{
       const v = snap.val();
       if(v){ lastRemote = v; applyingRemote=true; S = hydrate(v); rotCache=new Map(); try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} render(); applyingRemote=false; setSync('✓ Sincronizado');
+        setTimeout(maybePromptDelegate, 800);
         let ch=false;
         if(isEditor && !S.mig4){ S.rotation.hours = NEW_HOURS(); S.mig4 = true; ch=true; }
         if(isEditor && !S.mig8){ (S.rotation.positions||[]).forEach(p=>{ if((p.name==='Oficina 1'||p.name==='Oficina 3') && !(p.onsite||[]).length) p.onsite=[4]; }); S.mig8=true; ch=true; }
