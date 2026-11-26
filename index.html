@@ -454,9 +454,8 @@ function vacDur(v){ const n=businessDays(v.start,v.end); return isHX(v) ? fmtH(h
 function vacWhen(v){ return isHX(v) ? `${nice(v.start)} · ${v.tStart||''}–${v.tEnd||''}` : `${nice(v.start)} – ${nice(v.end)}`; }
 function groupFilter(sel, mid){ if(!sel) return true; if(sel.startsWith('g:')) return (member(mid)?.group||'')===sel.slice(2); return mid===sel; }
 function groupMemberOptions(sel){ return `<option value="">Todo el equipo</option><optgroup label="Grupos">${GROUPS.map(g=>`<option value="g:${g}" ${sel==='g:'+g?'selected':''}>${g}</option>`).join('')}</optgroup><optgroup label="Integrantes">${S.members.map(m=>`<option value="${m.id}" ${m.id===sel?'selected':''}>${esc(m.name)}</option>`).join('')}</optgroup>`; }
-// Tono suave del color de la persona para sombrear ausencias en el calendario
-function tint(hex){ const m=/^#?([0-9a-f]{6})$/i.exec(hex||''); if(!m) return '#f1f3f7'; const n=parseInt(m[1],16), mix=c=>Math.round(c+(255-c)*0.85);
-  return `rgb(${mix(n>>16)},${mix((n>>8)&255)},${mix(n&255)})`; }
+// Sombreado de ausencias aprobadas en el calendario
+function tint(){ return '#eef0f3'; } // gris claro único para todas las ausencias aprobadas
 function offOn(dateS, includePending=false){
   return S.vacations.filter(v=>!isHX(v) && (v.status==='Aprobada' || (includePending && v.status==='Pendiente')) && inRange(dateS,v.start,v.end));
 }
