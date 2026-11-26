@@ -73,8 +73,8 @@ label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mu
 .cal .num{font-weight:600;margin-bottom:4px;display:flex;justify-content:space-between}
 .cal .num .off{color:var(--bad);font-weight:600}
 .chip{display:block;border-radius:4px;padding:2px 5px;margin-bottom:2px;color:#fff;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chip.vac{background:#fff!important;color:var(--ink);border-left:4px solid;border-top:1px solid #eef0f4;border-right:1px solid #eef0f4;border-bottom:1px solid #eef0f4}
-.chip.vac.vpend{border-left-style:dashed;color:var(--muted)}
+.chip.vac{background:#fff;color:var(--ink);border-left:4px solid;border-top:1px solid #eef0f4;border-right:1px solid #eef0f4;border-bottom:1px solid #eef0f4}
+.chip.vac.vpend{border-left-style:dashed;color:var(--muted);background:#fff!important}
 .chip.cv{background:#fff!important;color:var(--ink);border-left:4px solid;border-top:1px solid #eef0f4;border-right:1px solid #eef0f4;border-bottom:1px solid #eef0f4}
 .chip.pend{background:#fff!important;border:1.5px dashed;color:var(--ink)}
 .cal .d.hol{background:#fff5f5}
@@ -454,6 +454,9 @@ function vacDur(v){ const n=businessDays(v.start,v.end); return isHX(v) ? fmtH(h
 function vacWhen(v){ return isHX(v) ? `${nice(v.start)} · ${v.tStart||''}–${v.tEnd||''}` : `${nice(v.start)} – ${nice(v.end)}`; }
 function groupFilter(sel, mid){ if(!sel) return true; if(sel.startsWith('g:')) return (member(mid)?.group||'')===sel.slice(2); return mid===sel; }
 function groupMemberOptions(sel){ return `<option value="">Todo el equipo</option><optgroup label="Grupos">${GROUPS.map(g=>`<option value="g:${g}" ${sel==='g:'+g?'selected':''}>${g}</option>`).join('')}</optgroup><optgroup label="Integrantes">${S.members.map(m=>`<option value="${m.id}" ${m.id===sel?'selected':''}>${esc(m.name)}</option>`).join('')}</optgroup>`; }
+// Tono suave del color de la persona para sombrear ausencias en el calendario
+function tint(hex){ const m=/^#?([0-9a-f]{6})$/i.exec(hex||''); if(!m) return '#f1f3f7'; const n=parseInt(m[1],16), mix=c=>Math.round(c+(255-c)*0.85);
+  return `rgb(${mix(n>>16)},${mix((n>>8)&255)},${mix(n&255)})`; }
 function offOn(dateS, includePending=false){
   return S.vacations.filter(v=>!isHX(v) && (v.status==='Aprobada' || (includePending && v.status==='Pendiente')) && inRange(dateS,v.start,v.end));
 }
@@ -1213,12 +1216,12 @@ function chipsFull(s, D, compact){
   const gChips = D.gds.map(g=>{
     const v = D.vacs.find(x=>x.memberId===g.memberId);
     if(v){ merged.add(v.id);
-      return `<span class="chip gd" style="border-color:${mColor(g.memberId)}" title="Guardia ${esc(g.team||'')} + ${esc(v.type)} (${v.status})" ${v.req?'':`onclick="vacForm('${v.id}')"`}>🚨${vacIcon(v)} ${compact?'':'Guardia '+esc(g.team||'')+' · '+esc(v.type)+(v.status==='Pendiente'?' (pendiente)':'')+': '}${esc(mName(g.memberId))}</span>`; }
+      return `<span class="chip gd" style="border-color:${mColor(g.memberId)};${v.status==='Aprobada'?`background:${tint(mColor(g.memberId))}!important`:''}" title="Guardia ${esc(g.team||'')} + ${esc(v.type)} (${v.status})" ${v.req?'':`onclick="vacForm('${v.id}')"`}>🚨${vacIcon(v)} ${compact?'':'Guardia '+esc(g.team||'')+' · '+esc(v.type)+(v.status==='Pendiente'?' (pendiente)':'')+': '}${esc(mName(g.memberId))}</span>`; }
     return `<span class="chip gd" style="border-color:${mColor(g.memberId)}" title="Guardia ${esc(g.team||'')}">🚨 ${compact?'':'Guardia '+esc(g.team||'')+': '}${esc(mName(g.memberId))}</span>`;
   }).join('');
   return `${D.hol?`<span class="chip holc">🎉 ${esc(D.hol.name)}</span>`:''}
     ${gChips}
-    ${D.vacs.filter(v=>!merged.has(v.id)).map(v=>`<span class="chip vac ${v.status==='Pendiente'?'vpend':''}" style="border-left-color:${mColor(v.memberId)}" title="${esc(v.type)} (${v.status})" ${v.req?'':`onclick="vacForm('${v.id}')"`}>${vacIcon(v)} ${esc(mName(v.memberId))}${compact?'':' · '+esc(v.type)+(v.status==='Pendiente'?' (pendiente)':'')}</span>`).join('')}
+    ${D.vacs.filter(v=>!merged.has(v.id)).map(v=>`<span class="chip vac ${v.status==='Pendiente'?'vpend':''}" style="border-left-color:${mColor(v.memberId)};background:${tint(mColor(v.memberId))}" title="${esc(v.type)} (${v.status})" ${v.req?'':`onclick="vacForm('${v.id}')"`}>${vacIcon(v)} ${esc(mName(v.memberId))}${compact?'':' · '+esc(v.type)+(v.status==='Pendiente'?' (pendiente)':'')}</span>`).join('')}
     ${D.hxs.map(v=>`<span class="chip hx ${v.status==='Pendiente'?'pend':''}" style="border-color:${mColor(v.memberId)}" title="${HX} (${v.status})" onclick="vacForm('${v.id}')">⏱ ${esc(mName(v.memberId))} ${v.tStart||''}–${v.tEnd||''}</span>`).join('')}`;
 }
 function coverageHTML(s, full){
