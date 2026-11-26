@@ -309,6 +309,7 @@ table.mh .mrole{display:none}
     <button class="nav" data-view="schedules" data-s="Horarios">🕘 <span class="t">Horarios</span></button>
     <button class="nav" data-view="vacations" data-s="Ausencias">🌴 <span class="t">Vacaciones / Ausencias</span><span class="badge hidden" id="pendBadge">0</span></button>
     <button class="nav" data-view="oncall" data-s="Guardias">🚨 <span class="t">Guardias</span></button>
+    <button class="nav" data-view="overtime" data-s="Horas extras">⏱️ <span class="t">Horas extras</span></button>
     <button class="nav" data-view="calendar" data-s="Calendario">📅 <span class="t">Calendario</span></button>
     <button class="nav" data-view="team" data-s="Equipo">👥 <span class="t">Equipo</span></button>
     <button class="nav edit-only" data-view="userview" data-s="Vista usuario">👁 <span class="t">Vista usuario</span></button>
@@ -581,6 +582,17 @@ function buildWeeklyEmail(mid, today, reqs){
 
 /* ================== Solicitudes de usuarios (vacaciones e intercambios) ================== */
 let requests = {}, reqRef = null;
+let overtimeData = {}, otRef = null, otAdmin = null;
+// Horas extras: los administradores leen todo; cada usuario solo sus registros (consulta por correo, así lo exigen las reglas)
+function subOvertime(user){
+  const adm = isOwner || !!editors[user.uid];
+  if(otRef && otAdmin===adm) return;
+  if(otRef) otRef.off();
+  otAdmin = adm;
+  const base = firebase.database().ref('overtime');
+  otRef = adm ? base : base.orderByChild('email').equalTo((user.email||'').toLowerCase());
+  otRef.on('value', snap=>{ overtimeData = snap.val()||{}; if(ui.view==='overtime') render(); }, ()=>{ overtimeData = {}; });
+}
 const reqList = () => Object.entries(requests||{}).map(([id,r])=>Object.assign({id}, r));
 const REQ_COLORS = { 'Pendiente':['#fff4dc','#8a5a00'], 'Esperando compañero':['#e8f0fe','#1f4fb8'], 'Por aprobar':['#fff4dc','#8a5a00'], 'Aprobada':['#e3f6eb','#17663a'], 'Rechazada':['#fde8e8','#9b2c2c'], 'Cancelada':['#eee','#777'] };
 const reqPill = st => { const c=REQ_COLORS[st]||['#eee','#555']; return `<span class="pill" style="background:${c[0]};color:${c[1]}">${esc(st)}</span>`; };
@@ -760,8 +772,117 @@ function reqAct(id, action){
 function renderBadge(){ const n = S.vacations.filter(v=>v.status==='Pendiente').length + (isEditor ? reqList().filter(reqNeedsAdmin).length : reqList().filter(reqIncoming).length); const b=document.getElementById('pendBadge'); b.textContent=n; b.classList.toggle('hidden', !n); }
 function isMobile(){ return window.matchMedia('(max-width:700px)').matches; }
 window.matchMedia('(max-width:700px)').addEventListener('change', ()=>render());
-function render(){ const f = {dashboard,calendar,vacations,oncall,schedules,team,settings,userview}[ui.view] || dashboard; document.getElementById('main').innerHTML = asBanner() + f(); renderBadge();
+function render(){ const f = {dashboard,calendar,vacations,oncall,overtime,schedules,team,settings,userview}[ui.view] || dashboard; document.getElementById('main').innerHTML = asBanner() + f(); renderBadge();
   if(dbRef && !isEditor) document.querySelectorAll('#main [onchange*="S."],#main [oninput*="S."]').forEach(el=>{ el.disabled=true; el.removeAttribute('onchange'); el.removeAttribute('oninput'); });
+}
+
+/* ================== Vista: Horas extras ================== */
+const otList = () => Object.entries(overtimeData||{}).map(([id,o])=>({id,...o, uses: toArr(o.uses)}));
+const otUsed = o => (o.uses||[]).reduce((a,u)=>a+(+u.hours||0),0);
+const otLeft = o => Math.max(0, Math.round(((+o.hours||0) - otUsed(o))*100)/100);
+const fmtOT = h => (Math.round(h*100)/100).toString();
+function otStatus(o){ const u=otUsed(o), l=otLeft(o);
+  if(!u) return '<span class="pill Aprobada">Disponible</span>';
+  if(l>0) return '<span class="pill Pendiente">Parcial</span>';
+  return '<span class="pill" style="background:#eef1f6;color:#555d6e">Cambiada</span>'; }
+// ¿De quién son estos registros en pantalla? Usuario normal o «Vista usuario»: los suyos. Administrador: el filtro elegido.
+function otScope(){
+  if(ui.asMember){ const m=member(ui.asMember); return o=>o.memberId===ui.asMember || (m?.email && (o.email||'').toLowerCase()===m.email.toLowerCase()); }
+  if(!isEditor) return o=>fbUser && (o.email||'').toLowerCase()===(fbUser.email||'').toLowerCase();
+  const f=ui.otMember||''; return o=>!f || o.memberId===f;
+}
+function overtime(){
+  const canWrite = !ui.asMember && !!fbUser;
+  const list = otList().filter(otScope()).filter(o=>ui.otShow!=='disp' || otLeft(o)>0).sort((a,b)=>(b.date||'').localeCompare(a.date||'') || (b.start||'').localeCompare(a.start||''));
+  const scopeAll = otList().filter(otScope());
+  const tot = scopeAll.reduce((a,o)=>a+(+o.hours||0),0), used = scopeAll.reduce((a,o)=>a+otUsed(o),0);
+  const admin = isEditor && !ui.asMember;
+  const who = o => { const m=member(o.memberId); return m ? `<span class="dot" style="background:${m.color}"></span>${esc(m.name)}` : esc(o.name||o.email||''); };
+  // Resumen por persona (solo administradores, sin filtro)
+  let perPerson = '';
+  if(admin && !ui.otMember){
+    const by={}; otList().forEach(o=>{ const k=o.memberId||o.email; (by[k] ||= {o, tot:0, used:0}); by[k].tot+=(+o.hours||0); by[k].used+=otUsed(o); });
+    const rows=Object.values(by).sort((a,b)=>(b.tot-b.used)-(a.tot-a.used));
+    perPerson = rows.length?`<div class="panel"><h3>Saldo por persona</h3><table><tr><th>Integrante</th><th>Registradas</th><th>Cambiadas</th><th>Disponibles</th><th></th></tr>
+      ${rows.map(r=>`<tr><td>${who(r.o)}</td><td>${fmtOT(r.tot)} h</td><td>${fmtOT(r.used)} h</td><td><b>${fmtOT(r.tot-r.used)} h</b></td><td style="text-align:right"><button class="btn sec sm" onclick="ui.otMember='${r.o.memberId||''}';render()">Ver</button></td></tr>`).join('')}</table></div>`:'';
+  }
+  return `<div class="head"><h2>Horas extras</h2><div class="toolbar">
+      ${admin?`<select onchange="ui.otMember=this.value;render()"><option value="">Todo el equipo</option>${S.members.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(m=>`<option value="${m.id}" ${ui.otMember===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select>`:''}
+      <select onchange="ui.otShow=this.value;render()"><option value="">Todas</option><option value="disp" ${ui.otShow==='disp'?'selected':''}>Con horas disponibles</option></select>
+      ${admin?`<button class="btn sec" onclick="otCSV()">⬇ CSV</button>`:''}
+      ${canWrite?`<button class="btn" onclick="otForm()">+ Registrar horas</button>`:''}
+    </div></div>
+    <div class="grid4" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi"><div class="n">${fmtOT(tot)} h</div><div class="l">Registradas</div></div>
+      <div class="kpi"><div class="n">${fmtOT(used)} h</div><div class="l">Cambiadas</div></div>
+      <div class="kpi"><div class="n" style="color:var(--accent)">${fmtOT(tot-used)} h</div><div class="l">Disponibles para cambiar</div></div>
+    </div>
+    ${perPerson}
+    <div class="panel">${list.length?`<table><tr>${admin&&!ui.otMember?'<th>Integrante</th>':''}<th>Reporte</th><th>Fecha</th><th>Horario</th><th>Horas</th><th>Estado</th><th>Cambiadas</th><th>Comentarios</th><th></th></tr>
+      ${list.map(o=>{ const mine = fbUser && (o.email||'').toLowerCase()===(fbUser.email||'').toLowerCase(); const can = canWrite && (admin || mine);
+        return `<tr>${admin&&!ui.otMember?`<td>${who(o)}</td>`:''}<td>${esc(o.report||'—')}</td><td>${nice(o.date)}</td><td class="muted">${esc(o.start)}–${esc(o.end)}</td><td><b>${fmtOT(+o.hours||0)} h</b></td><td>${otStatus(o)}</td>
+        <td class="muted" style="font-size:12px">${(o.uses||[]).map(u=>`${fmtOT(+u.hours)} h · ${nice(u.date)}`).join('<br>')||'—'}</td>
+        <td class="muted" style="font-size:12px;max-width:240px">${esc(o.notes||'')}</td>
+        <td style="text-align:right;white-space:nowrap">${can?`${otLeft(o)>0?`<button class="btn sec sm" onclick="otUseForm('${o.id}')" title="Registrar que cambiaste estas horas">🔁 Cambiar</button> `:''}<button class="btn sec sm" onclick="otForm('${o.id}')">Editar</button> <button class="btn sec sm" onclick="otDel('${o.id}')" title="Eliminar">🗑</button>`:''}</td></tr>`; }).join('')}</table>`
+      :`<div class="empty">${canWrite?'Aún no hay horas extras registradas. Usa <b>+ Registrar horas</b> para agregar las primeras.':'Sin horas extras registradas.'}</div>`}</div>
+    <p class="muted" style="font-size:12px">Las horas se calculan solas con la hora de inicio y fin (si terminas después de medianoche, se toma el día siguiente). Cuando uses horas, da clic en <b>🔁 Cambiar</b> e indica cuántas y en qué fecha.</p>`;
+}
+function otForm(id){
+  const o = id ? otList().find(x=>x.id===id) : {report:'', date:todayS(), start:'', end:'', notes:''};
+  if(!o) return;
+  const admin = isEditor && !ui.asMember;
+  openModal(`<h3>${id?'Editar':'Registrar'} horas extras</h3>
+    <div class="form">
+      ${admin && !id?`<label class="f full">Integrante<select id="otM"><option value="">Yo (${esc(myMember()?.name||fbUser?.email||'')})</option>${S.members.filter(m=>m.email).map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select></label>`:''}
+      <label class="f">Reporte / ticket<input id="otR" value="${esc(o.report||'')}" placeholder="Ej. INC123456 o motivo corto"></label>
+      <label class="f">Fecha<input type="date" id="otD" value="${o.date||todayS()}"></label>
+      <label class="f">Hora inicio<input type="time" id="otS" value="${o.start||''}" oninput="otPreview()"></label>
+      <label class="f">Hora final<input type="time" id="otE" value="${o.end||''}" oninput="otPreview()"></label>
+      <div class="f full" id="otP" style="font-size:14px"></div>
+      <label class="f full">Comentarios<textarea id="otN" placeholder="Qué se atendió, con quién…">${esc(o.notes||'')}</textarea></label>
+    </div>
+    <div style="text-align:right;margin-top:12px"><button class="btn sec" onclick="closeModal()">Cancelar</button> <button class="btn" onclick="otSave('${id||''}')">Guardar</button></div>`);
+  otPreview();
+}
+function otPreview(){ const a=val('otS'), b=val('otE'), el=document.getElementById('otP'); if(!el) return;
+  el.innerHTML = a&&b ? `Total: <b>${fmtOT(hoursBetween(a,b))} h</b>${b<=a?' <span class="muted">(termina al día siguiente)</span>':''}` : '<span class="muted">Escribe la hora de inicio y final para calcular el total.</span>'; }
+function otSave(id){
+  const start=val('otS'), end=val('otE'), date=val('otD');
+  if(!date || !start || !end) return toast('Falta la fecha o las horas');
+  const hours = Math.round(hoursBetween(start,end)*100)/100;
+  if(!hours) return toast('La hora final debe ser distinta a la de inicio');
+  const ref = firebase.database().ref('overtime');
+  if(id){ const o=otList().find(x=>x.id===id); if(hours < otUsed(o)) return toast('No puede ser menor a las horas ya cambiadas');
+    return ref.child(id).update({report:val('otR').trim(), date, start, end, hours, notes:val('otN').trim()}).then(()=>{ closeModal(); toast('Guardado'); }).catch(e=>toast('No se pudo guardar: '+e.message)); }
+  const forId = document.getElementById('otM') ? val('otM') : '';
+  const m = forId ? member(forId) : myMember();
+  const rec = {uid: forId ? '' : fbUser.uid, email: (forId ? (m.email||'') : fbUser.email).toLowerCase(), memberId: m?.id||'', name: m?.name||fbUser.email,
+    report:val('otR').trim(), date, start, end, hours, notes:val('otN').trim(), createdAt: new Date().toISOString()};
+  ref.push(rec).then(()=>{ closeModal(); toast('Horas registradas'); }).catch(e=>toast('No se pudo guardar: '+e.message));
+}
+function otUseForm(id){
+  const o=otList().find(x=>x.id===id); if(!o) return;
+  openModal(`<h3>🔁 Cambiar horas</h3><p class="muted" style="margin-top:0">${esc(o.report||'Horas extras')} · ${nice(o.date)} · disponibles: <b>${fmtOT(otLeft(o))} h</b></p>
+    <div class="form"><label class="f">Horas que cambias<input type="number" id="otUH" min="0.25" step="0.25" max="${otLeft(o)}" value="${otLeft(o)}"></label>
+    <label class="f">Fecha en que las usas<input type="date" id="otUD" value="${todayS()}"></label></div>
+    <div style="text-align:right;margin-top:12px"><button class="btn sec" onclick="closeModal()">Cancelar</button> <button class="btn" onclick="otUse('${id}')">Guardar</button></div>`);
+}
+function otUse(id){
+  const o=otList().find(x=>x.id===id); const h=+val('otUH'), d=val('otUD');
+  if(!(h>0) || h>otLeft(o)+1e-9) return toast('Escribe entre 0.25 y '+fmtOT(otLeft(o))+' horas');
+  if(!d) return toast('Falta la fecha');
+  firebase.database().ref('overtime/'+id+'/uses').set([...(o.uses||[]), {hours:h, date:d}]).then(()=>{ closeModal(); toast('Cambio registrado'); }).catch(e=>toast('No se pudo guardar: '+e.message));
+}
+function otDel(id){
+  const o=otList().find(x=>x.id===id); if(!o) return;
+  if(!confirm(`¿Eliminar el registro del ${nice(o.date)} (${fmtOT(+o.hours)} h)? No se puede deshacer.`)) return;
+  firebase.database().ref('overtime/'+id).remove().then(()=>toast('Eliminado')).catch(e=>toast('No se pudo eliminar: '+e.message));
+}
+function otCSV(){
+  const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const rows=[['Integrante','Reporte','Fecha','Hora Inicio','Hora Final','Horas totales','Cambiadas','Fecha utilizadas','Disponibles','Comentarios']];
+  otList().filter(otScope()).sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(o=>rows.push([member(o.memberId)?.name||o.name||o.email, o.report, o.date, o.start, o.end, o.hours, otUsed(o), (o.uses||[]).map(u=>u.date).join(' / '), otLeft(o), o.notes]));
+  download(`horas-extras-${todayS()}.csv`, '\ufeff'+rows.map(r=>r.map(q).join(',')).join('\r\n'), 'text/csv;charset=utf-8');
 }
 
 /* ================== Vista: Resumen ================== */
@@ -1820,7 +1941,7 @@ function resetPass(){
     reqRef = firebase.database().ref('requests');
     reqRef.on('value', snap=>{ requests = snap.val()||{}; render(); }, ()=>{ requests={}; });
     edRef = firebase.database().ref('editors');
-    edRef.on('value', snap=>{ editors = snap.val()||{}; const was=isEditor; applyRole(); if(was!==isEditor || ui.view==='settings') render(); }, ()=>{ editors={}; applyRole(); });
+    edRef.on('value', snap=>{ editors = snap.val()||{}; const was=isEditor; applyRole(); subOvertime(user); if(was!==isEditor || ui.view==='settings') render(); }, ()=>{ editors={}; applyRole(); subOvertime(user); });
     dbRef = firebase.database().ref(DB_PATH);
     dbRef.on('value', snap=>{
       const v = snap.val();

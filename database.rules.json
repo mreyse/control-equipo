@@ -13,6 +13,15 @@
       "$rid": {
         ".write": "auth != null && newData.exists() && (auth.uid === 'OjirKqjwMNX1xhXs6o3Ww23WsBH2' || root.child('editors').child(auth.uid).exists() || (!data.exists() && newData.child('uid').val() === auth.uid && newData.child('status').val() !== 'Aprobada') || (data.exists() && newData.child('uid').val() === data.child('uid').val() && newData.child('status').val() !== 'Aprobada' && (data.child('uid').val() === auth.uid || data.child('targetEmail').val() === auth.token.email)))"
       }
+    },
+    "overtime": {
+      ".read": "auth != null && (auth.uid === 'OjirKqjwMNX1xhXs6o3Ww23WsBH2' || root.child('editors').child(auth.uid).exists() || (query.orderByChild === 'email' && query.equalTo === auth.token.email))",
+      ".indexOn": [
+        "email"
+      ],
+      "$oid": {
+        ".write": "auth != null && (auth.uid === 'OjirKqjwMNX1xhXs6o3Ww23WsBH2' || root.child('editors').child(auth.uid).exists() || (!data.exists() && newData.child('email').val() === auth.token.email) || (data.exists() && data.child('email').val() === auth.token.email && (!newData.exists() || newData.child('email').val() === auth.token.email)))"
+      }
     }
   }
 }

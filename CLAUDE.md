@@ -14,7 +14,7 @@ Página web para controlar **horarios rotativos, guardias, vacaciones/ausencias,
 | Pieza | Detalle |
 |---|---|
 | Autenticación | Firebase Auth, correo/contraseña. Registro libre desactivado; los usuarios los crea el propietario en la consola. |
-| Base de datos | `/controlEquipo` (todo el estado de la app en un objeto), `/editors/{uid}` (administradores), `/requests/{pushId}` (solicitudes de usuarios). |
+| Base de datos | `/controlEquipo` (todo el estado de la app en un objeto), `/editors/{uid}` (administradores), `/requests/{pushId}` (solicitudes de usuarios), `/overtime/{pushId}` (horas extras). |
 | SDK | firebase compat 10.14.1 desde gstatic (app, auth, database). |
 | Caché local | `localStorage` clave `controlEquipo.v2` (solo caché; la fuente de verdad es Firebase). |
 | Migraciones | Banderas `S.mig3`, `S.mig4`, `S.mig5` en los datos; se aplican cuando entra un editor. |
@@ -26,7 +26,7 @@ Página web para controlar **horarios rotativos, guardias, vacaciones/ausencias,
 - **Vinculación usuario ↔ integrante:** por **correo** (campo Correo de la ficha en Equipo = correo de Firebase Auth). Función `myMember()`.
 
 ### Reglas de Firebase vigentes
-Ver `database.rules.json`. Resumen: lectura para cualquier autenticado; `/controlEquipo` solo propietario y editores; `/editors` solo propietario; `/requests` crear a su nombre, modificar solo creador o compañero destino (`targetEmail`), nadie puede marcar `Aprobada` salvo editores, no se puede borrar.
+Ver `database.rules.json`. Resumen: lectura para cualquier autenticado; `/controlEquipo` solo propietario y editores; `/editors` solo propietario; `/requests` crear a su nombre, modificar solo creador o compañero destino (`targetEmail`), nadie puede marcar `Aprobada` salvo editores, no se puede borrar. `/overtime`: editores leen/escriben todo; cada usuario solo lee (consulta `orderByChild('email').equalTo(su correo)`, `.indexOn: email`) y crea/edita/borra sus registros (`email` = `auth.token.email`, en minúsculas).
 
 ## Modelo de datos (`S`)
 - `members[]`: `{id,name,group('Colaboración'|'MM'|'Desarrollo'),role,email,phone,color,vacDays,oncall,shifts,fixed:{start,end,days[]}|null}`
@@ -37,6 +37,7 @@ Ver `database.rules.json`. Resumen: lectura para cualquier autenticado; `/contro
 - `settings`: `{maxOff, defaultDays:18, guardPhones:{Colaboración,MM}, mail:{enabled,fromName,replyTo}}`
 - `notices[]` (avisos): `{id,icon,text(**negritas**),date?,dateEnd?,tStart?,tEnd?,from?,to?,createdAt}` — se muestran en Resumen y en el correo semanal.
 - `members[].mail` (bool): recibe el correo semanal (apagado por defecto; el propietario decide a quién).
+- `/overtime/{id}`: `{uid,email(minúsculas),memberId,name,report,date,start,end,hours,notes,uses:[{hours,date}],createdAt}` — Horas extras: total por hora inicio/fin (cruza medianoche), «🔁 Cambiar» registra horas usadas y fecha; estados Disponible / Parcial / Cambiada. Admin: filtro por persona, «Saldo por persona», CSV.
 - `/requests`: `kind` = `vac` | `swap` (turno) | `gswap` (guardia); estados: `Pendiente`, `Esperando compañero`, `Por aprobar`, `Aprobada`, `Rechazada`, `Cancelada`.
 
 ## Reglas de negocio
@@ -62,7 +63,7 @@ Ver `database.rules.json`. Resumen: lectura para cualquier autenticado; `/contro
 - Calendario: vista predeterminada **Semana** (también Día y Mes). Ausencias y turnos **sin relleno**, solo línea de color a la izquierda. Guardia + vacaciones de la misma persona en **una sola línea** (🚨🌴).
 - Resumen: tarjetas en orden **De guardia hoy · Ausentes hoy · Integrantes (solo lectura: «Lo que sigue para ti», semanas para su guardia y para Mañana/Mutante/Tarde) · Solicitudes pendientes**; luego Turnos de hoy (3 columnas: Turnos / Oficina / Horario fijo) a la izquierda y Próximas guardias (línea de tiempo) a la derecha; después Ausencias próximas (Avisos van antes que Próximo día festivo, arriba de Turnos de hoy); luego Pendientes/Mis solicitudes y Saldo; Conflictos al final (solo editores).
 - **Acomodo del Resumen por persona:** `settings.dashLayout = {memberId: 'turnos'}` (Ajustes → Acomodo del Resumen). `general` = Avisos y festivo arriba; `turnos` = Turnos de hoy + Próximas guardias, luego Ausencias próximas, después Avisos y festivo. Se aplica según `myMember()` (también en Vista usuario).
-- Menú lateral en orden: Resumen · Horarios · Vacaciones/Ausencias · Guardias · Calendario · Equipo · Vista usuario (solo editores) · Ajustes.
+- Menú lateral en orden: Resumen · Horarios · Vacaciones/Ausencias · Guardias · Horas extras · Calendario · Equipo · Vista usuario (solo editores) · Ajustes.
 - **Vista usuario:** el editor elige a una persona y ve toda la página como ella (`ui.asMember`, fuerza solo lectura; acciones de solicitudes bloqueadas). Banner amarillo para cambiar de persona o salir.
 - Festivos en Resumen: los que faltan del mes en curso; si no hay, el próximo. Cada uno con emoji temático (`holidayEmoji`).
 - Horarios: diseño minimalista (sin encabezados oscuros ni cuadrícula; columna Rol en gris; etiquetas suaves solo para Mañana/Mutante/Tarde/Home office; 🚨 = guardia; ✎ = cambio manual; 🏢 Presencial = días que el rol debe acudir a la oficina (`positions[].onsite`, Oficina 1 y 3 los viernes); columnas Rol · Ingeniero; tablas tituladas «Horario Colaboración» (rotación), «MM» y «Soporte Colaboración» (horario fijo excepto MM), en ese orden).
