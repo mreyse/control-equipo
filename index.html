@@ -1665,8 +1665,8 @@ function fixedTable(week){
       return mhCell(m.id, s, '—', 'off', 'Descanso');
     }).join('');
     return `<tr><td class="l rolec">${esc(m.group||'')}</td><td class="l nm"><span class="dot" style="background:${m.color}"></span>${esc(m.name)}<span class="mrole">${esc(m.group||'')}</span></td>${cells}<td class="hrs">${hrs.toFixed(1).replace('.0','')}</td></tr>`; };
-  const sets = [['MM', fx.filter(m=>m.group==='MM')], ['Soporte Colaboración', fx.filter(m=>m.group!=='MM')]];
-  return sets.filter(([,list])=>list.length).map(([title,list])=>`<div class="panel mhwrap"><p class="mhsub">${title}</p><table class="mh">${mhHead(week,'Colaborador')}${list.map(rowFor).join('')}</table></div>`).join('');
+  const sets = [['MM', fx.filter(m=>m.group==='MM')], ['', fx.filter(m=>m.group!=='MM')]];
+  return sets.filter(([,list])=>list.length).map(([title,list])=>`<div class="panel mhwrap">${title?`<p class="mhsub">${title}</p>`:''}<table class="mh">${mhHead(week,'Colaborador')}${list.map(rowFor).join('')}</table></div>`).join('');
 }
 function cellEdit(mid, s){
   const ov = S.rotation.overrides[mid+'|'+s];
