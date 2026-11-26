@@ -283,7 +283,7 @@ table.mh .today{background:#f6f9ff}
 table.mh td.off{color:#b5bccb}
 table.mh td.hol{color:#a32d2d}
 table.mh td.fixedh{color:#555d6e}
-.mnrow{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0;border-bottom:1px solid #f0f2f6}.mnrow:last-child{border-bottom:0}.dlwk{margin-bottom:12px}.dlwk-t{font-size:12px;font-weight:600;color:#555d6e;margin-bottom:4px}.dlcal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.dlh{font-size:11px;color:var(--muted);text-align:center;padding:2px 0}.dlc{border:1px solid #eef0f4;border-radius:6px;padding:4px 6px;min-height:58px;cursor:pointer;font-size:12px;overflow:hidden}.dlc:hover{border-color:var(--accent)}.dlc.out{opacity:.4}.dlc.wk{background:#fafbfc}.dlc.today{border-color:var(--accent);background:#f5f8ff}.dlc-d{font-size:11px;color:var(--muted)}.dlc-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}.dlgrid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px}.dlw{border:1px solid #eef0f4;border-radius:8px;padding:8px}.dlw.cur{border-color:var(--accent);background:#f5f8ff}.dln{font-size:13px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}@media(max-width:900px){.dlgrid{grid-template-columns:repeat(2,1fr)}}table.mh .hxn{font-size:11px;color:#8a5a00;margin-top:2px;white-space:nowrap}table.mh .covn2{color:#4a5568;white-space:normal;line-height:1.25}.hchip{background:#eef1f6;color:#3d4452;border-radius:999px;padding:3px 10px;font-size:12px}.mnrow.mnhead{font-size:11px;color:var(--muted,#8a93a3);padding:0 0 2px}
+.mnrow{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0;border-bottom:1px solid #f0f2f6}.mnrow:last-child{border-bottom:0}.dlwk{margin-bottom:12px}.dlwk-t{font-size:12px;font-weight:600;color:#555d6e;margin-bottom:4px}.dlcal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.dlh{font-size:11px;color:var(--muted);text-align:center;padding:2px 0}.dlc{border:1px solid #eef0f4;border-radius:6px;padding:4px 6px;min-height:58px;cursor:pointer;font-size:12px;overflow:hidden}.dlc:hover{border-color:var(--accent)}.dlc.out{opacity:.4}.dlc.wk{background:#fafbfc}.dlc.today{border-color:var(--accent);background:#f5f8ff}.dlc-d{font-size:11px;color:var(--muted)}.dlc-a{font-size:11px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dlc-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}.dlgrid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px}.dlw{border:1px solid #eef0f4;border-radius:8px;padding:8px}.dlw.cur{border-color:var(--accent);background:#f5f8ff}.dln{font-size:13px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}@media(max-width:900px){.dlgrid{grid-template-columns:repeat(2,1fr)}}table.mh .hxn{font-size:11px;color:#8a5a00;margin-top:2px;white-space:nowrap}table.mh .covn2{color:#4a5568;white-space:normal;line-height:1.25}.hchip{background:#eef1f6;color:#3d4452;border-radius:999px;padding:3px 10px;font-size:12px}.mnrow.mnhead{font-size:11px;color:var(--muted,#8a93a3);padding:0 0 2px}
 table.mh td.rolec{color:var(--muted);font-size:12px}
 table.mh td.hrs{color:var(--muted);text-align:right}
 table.mh .mrole{display:none}
@@ -784,11 +784,13 @@ function render(){ const f = {dashboard,calendar,vacations,oncall,overtime,sched
 // Si no hay nadie asignado, el delegado es el predeterminado (S.settings.defaultDelegate), salvo que esté ausente.
 function delegateOn(s){ return S.delegates.filter(d=>inRange(s,d.start,d.end)); }
 const defDel = () => S.settings.defaultDelegate || '';
+const secDel = () => (S.settings.secondDelegate && S.settings.secondDelegate!==defDel()) ? S.settings.secondDelegate : '';
 function absentOn(mid, s){ return S.vacations.some(v=>v.memberId===mid && v.status==='Aprobada' && !isHX(v) && inRange(s,v.start,v.end)); }
 // Días (de una ausencia del predeterminado) que no tienen delegado asignado
 // Delegado efectivo de un día: el asignado que no esté ausente; si no, el predeterminado si no está ausente; si no, nadie (falta delegado)
 function effDelegate(s){ const a=delegateOn(s).find(d=>!absentOn(d.memberId,s)); if(a) return {id:a.memberId, src:'asignado'};
-  const dd=defDel(); if(dd && !absentOn(dd,s)) return {id:dd, src:'predeterminado'}; return null; }
+  const dd=defDel(); if(dd && !absentOn(dd,s)) return {id:dd, src:'predeterminado'};
+  const sd=secDel(); if(sd && !absentOn(sd,s)) return {id:sd, src:'secundario'}; return null; }
 function isGapDay(s){ return needsDelegate(s) && !!defDel() && !effDelegate(s); }
 function gapDays(a, b){ const out=[]; for(let d=pd(a); fd(d)<=b; d.setDate(d.getDate()+1)) if(isGapDay(fd(d))) out.push(fd(d)); return out; }
 // Agrupa días sin delegado en rangos continuos (los fines de semana/festivos no rompen el rango)
@@ -799,7 +801,8 @@ function gapRanges(a, b){ const out=[];
 function gapsBetweenHasCover(a, b){ const d=pd(a); d.setDate(d.getDate()+1); for(; fd(d)<b; d.setDate(d.getDate()+1)){ const x=fd(d); if(needsDelegate(x) && !isGapDay(x)) return true; } return false; }
 function delegateGaps(v){ return gapDays(v.start, v.end); }
 function gapReason(s){ const parts=[]; delegateOn(s).forEach(d=>{ if(absentOn(d.memberId,s)) parts.push(mName(d.memberId).split(' ')[0]+' (asignado)'); });
-  const dd=defDel(); if(dd && absentOn(dd,s)) parts.push(mName(dd).split(' ')[0]); return parts.length ? 'Ausentes: '+parts.join(', ') : ''; }
+  const dd=defDel(); if(dd && absentOn(dd,s)) parts.push(mName(dd).split(' ')[0]);
+  const sd=secDel(); if(sd && absentOn(sd,s)) parts.push(mName(sd).split(' ')[0]+' (secundario)'); return parts.length ? 'Ausentes: '+parts.join(', ') : ''; }
 // Solo días hábiles (lun–vie, sin festivo) requieren delegado
 function needsDelegate(s){ return dow(pd(s))<5 && !holidayOn(s); }
 // Al aprobar/registrar una ausencia del delegado predeterminado: abrir la ventana para asignar delegado en esas fechas
@@ -828,10 +831,13 @@ function delegates(){
       <div style="font-size:28px">🧑‍💼</div>
       <div><div class="muted" style="font-size:12px">Delegado hoy</div>
       ${(()=>{ const e=effDelegate(t); return e&&e.src==='asignado'; })()?delegateOn(t).filter(d=>!absentOn(d.memberId,t)).map(d=>`<div style="font-size:18px;font-weight:600">${esc(mName(d.memberId))} <span class="muted" style="font-size:13px;font-weight:400">hasta el ${nice(d.end)}${d.notes?' · '+esc(d.notes):''}</span></div>`).join('')
-        : dd ? (!effDelegate(t) ? `<div style="font-size:16px;color:var(--bad)">⚠ ${esc(mName(dd))} está ausente y no hay delegado asignado</div>` : `<div style="font-size:18px;font-weight:600">${esc(mName(dd))} <span class="muted" style="font-size:13px;font-weight:400">delegado predeterminado</span></div>`)
+        : dd ? (!effDelegate(t) ? `<div style="font-size:16px;color:var(--bad)">⚠ ${esc(mName(dd))} está ausente y no hay delegado asignado</div>` : `<div style="font-size:18px;font-weight:600">${esc(mName(effDelegate(t).id))} <span class="muted" style="font-size:13px;font-weight:400">${effDelegate(t).src==='secundario'?'delegado secundario ('+esc(mName(dd).split(' ')[0])+' ausente)':'delegado predeterminado'}</span></div>`)
         : '<div style="font-size:16px" class="muted">Nadie asignado para hoy</div>'}</div>
-      <label style="margin-left:auto;font-size:13px" class="muted">Delegado predeterminado (cuando no hay nadie asignado)<br>
-        <select onchange="S.settings.defaultDelegate=this.value;save();render()" style="margin-top:4px;min-width:220px"><option value="">— Ninguno —</option>${S.members.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(m=>`<option value="${m.id}" ${dd===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></label>
+      <div style="margin-left:auto;display:flex;gap:12px;flex-wrap:wrap">
+      <label style="font-size:13px" class="muted">1° Delegado predeterminado<br>
+        <select onchange="S.settings.defaultDelegate=this.value;save();render()" style="margin-top:4px;min-width:200px"><option value="">— Ninguno —</option>${S.members.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(m=>`<option value="${m.id}" ${dd===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></label>
+      <label style="font-size:13px" class="muted">2° Delegado secundario<br>
+        <select onchange="S.settings.secondDelegate=this.value;save();render()" style="margin-top:4px;min-width:200px"><option value="">— Ninguno —</option>${S.members.filter(m=>m.id!==dd).sort((a,b)=>a.name.localeCompare(b.name)).map(m=>`<option value="${m.id}" ${S.settings.secondDelegate===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></label></div>
     </div>
     ${!dd?`<div class="alert warn" style="margin-bottom:14px">👉 Elige arriba a la derecha el <b>Delegado predeterminado</b>. Es quien queda como delegado cuando no hay nadie asignado; cuando tenga vacaciones, aquí aparecerán sus fechas para asignar a alguien más.</div>`:''}
     ${gaps.length?`<div class="panel" style="border-left:4px solid var(--bad)"><h3>⚠ Días sin delegado disponible</h3><table>${gaps.map(r=>{ const g=gapDays(r.start,r.end); return `<tr><td>${r.start===r.end?nice(r.start):nice(r.start)+' – '+nice(r.end)}</td><td class="muted">${g.length} ${g.length===1?'día hábil':'días hábiles'}</td><td class="muted" style="font-size:12px">${esc(gapReason(r.start))}</td><td style="text-align:right"><button class="btn sm" onclick="openGapForm({start:'${r.start}',end:'${r.end}'})">Asignar delegado</button></td></tr>`; }).join('')}</table></div>`:''}
@@ -854,7 +860,7 @@ function delegateCalendar(){
   const t=todayS(), dd=defDel(), mon=mondayOf(t);
   const e365=new Date(); e365.setDate(e365.getDate()+365);
   const relevant=[...S.delegates.filter(d=>d.end>=t).map(d=>[d.start,d.end]), ...pendingDelegateGaps().map(r=>[r.start,r.end]),
-    ...(dd?S.vacations.filter(v=>v.memberId===dd && v.status==='Aprobada' && !isHX(v) && v.end>=t).map(v=>[v.start,v.end]):[])];
+    ...S.vacations.filter(v=>(v.memberId===dd || (secDel() && v.memberId===secDel())) && v.status==='Aprobada' && !isHX(v) && v.end>=t).map(v=>[v.start,v.end])];
   const weeks=new Set();
   relevant.forEach(([a,b])=>{ for(let d=pd(mondayOf(a>t?a:t)); fd(d)<=b; d.setDate(d.getDate()+7)) weeks.add(fd(d)); });
   const list=[...weeks].filter(w=>w>=mon).sort();
@@ -863,12 +869,15 @@ function delegateCalendar(){
     const cells=[...Array(7)].map((_,i)=>{ const d=new Date(a); d.setDate(a.getDate()+i); const s=fd(d), as=delegateOn(s);
       let body='';
       body=as.map(x=>absentOn(x.memberId,s)?`<div class="dlc-n muted" style="text-decoration:line-through">💂 ${esc(mName(x.memberId).split(' ')[0])}</div>`:`<div class="dlc-n">💂 <b>${esc(mName(x.memberId).split(' ')[0])}</b></div>`).join('');
+      const sd=secDel(), ef=effDelegate(s);
+      if(!as.some(x=>!absentOn(x.memberId,s)) && ef && ef.src==='secundario' && needsDelegate(s)) body+=`<div class="dlc-n">💂 ${esc(mName(sd).split(' ')[0])} <span class="muted" style="font-size:10px">2°</span></div>`;
       if(isGapDay(s)) body+=`<div class="dlc-n" style="color:var(--bad)" title="${esc(gapReason(s))}">⚠ Sin delegado</div>`;
-      const vac = dd && absentOn(dd,s);
-      return `<div class="dlc ${s===t?'today':''} ${i>=5?'wk':''} ${s<t?'out':''}" ${vac?'style="background:#eef0f3"':''} onclick="delForm(null,{start:'${s}',end:'${s}'})" title="${vac?esc(mName(dd))+' de vacaciones · ':''}Clic para asignar delegado este día"><div class="dlc-d">${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'][i]} ${d.getDate()}${vac?' 🌴':''}</div>${body}</div>`; }).join('');
+      const away=[dd,sd].filter(x=>x && absentOn(x,s));
+      const vac = away.length>0;
+      return `<div class="dlc ${s===t?'today':''} ${i>=5?'wk':''} ${s<t?'out':''}" ${vac?'style="background:#eef0f3"':''} onclick="delForm(null,{start:'${s}',end:'${s}'})" title="${away.map(x=>esc(mName(x))+' de vacaciones').join(' · ')}${vac?' · ':''}Clic para asignar delegado este día"><div class="dlc-d">${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'][i]} ${d.getDate()}</div>${away.map(x=>`<div class="dlc-a">🌴 ${esc(mName(x).split(' ')[0])}</div>`).join('')}${body}</div>`; }).join('');
     return `<div class="dlwk"><div class="dlwk-t">${nice(fd(a)).replace(/ \d{4}$/,'')} – ${nice(fd(e))}</div><div class="dlcal">${cells}</div></div>`; }).join('');
   return `<div class="panel"><h3>Calendario</h3>${rows}
-    <p class="muted" style="font-size:12px;margin:8px 0 0">🌴 y fondo gris = ${dd?esc(mName(dd).split(' ')[0])+' de vacaciones':'vacaciones'} · 💂 <b>nombre</b> = delegado ese día · <span style="color:var(--bad)">⚠ Sin delegado</span> = falta asignar. Clic en un día para asignar.</p></div>`;
+    <p class="muted" style="font-size:12px;margin:8px 0 0">Orden: 💂 asignado → 1° ${dd?esc(mName(dd).split(' ')[0]):'predeterminado'} → 2° ${secDel()?esc(mName(secDel()).split(' ')[0]):'secundario'} · 🌴 = de vacaciones · 💂 <b>nombre</b> = delegado ese día · <span style="color:var(--bad)">⚠ Sin delegado</span> = falta asignar. Clic en un día para asignar.</p></div>`;
 }
 function checkDelegateGapById(id){ const v=S.vacations.find(x=>x.id===id); if(v) checkDelegateGap(v); }
 function openGapForm(r, intro){ const days=gapDays(r.start, r.end);
