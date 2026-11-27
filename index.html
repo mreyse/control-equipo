@@ -1283,7 +1283,8 @@ function collabRotationWeeks(){ return Math.max(1, S.members.filter(m=>m.oncall!
 function dashboard(){
   const t = todayS(), yr = new Date().getFullYear();
   const pend = S.vacations.filter(v=>v.status==='Pendiente').sort((a,b)=>a.start.localeCompare(b.start));
-  const offToday = offOn(t);
+  // Ausentes hoy: ausencias aprobadas + «Horas extras a cambiar» del día (fuera por horas)
+  const offToday = [...offOn(t), ...S.vacations.filter(v=>isHX(v) && v.status==='Aprobada' && v.start===t && !offOn(t).some(o=>o.memberId===v.memberId))];
   const gdToday = guardOn(t);
   const in30 = fd(new Date(Date.now()+30*864e5));
   const upcoming = S.vacations.filter(v=>v.status==='Aprobada' && v.end>=t && v.start<=in30).sort((a,b)=>a.start.localeCompare(b.start));
@@ -1298,7 +1299,7 @@ function dashboard(){
   ${delegateBanner()}
   <div class="grid4">
     <div class="kpi"><div class="l" style="margin-bottom:6px">🚨 De guardia hoy</div>${['Colaboración','MM'].map(team=>{ const g=gdToday.find(x=>(x.team||'Colaboración')===team); return `<div class="gtoday"><div><span class="dot" style="background:${g?mColor(g.memberId):'#ccc'}"></span><b>${g?esc(mName(g.memberId)):'<span class="muted">Sin asignar</span>'}</b> <span class="muted" style="font-size:12px">${team}</span></div>${phoneLink(team)}</div>`; }).join('')}</div>
-    <div class="kpi"><div class="n">${offToday.length}</div><div class="l">Ausentes hoy</div>${offToday.length?`<div style="margin-top:6px;font-size:13px">${offToday.map(v=>`<div><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))} <span class="muted" style="font-size:11px">(${esc(v.type)}${v.end>t?` · hasta ${nice(v.end)}`:''})</span></div>`).join('')}</div>`:''}</div>
+    <div class="kpi"><div class="n">${offToday.length}</div><div class="l">Ausentes hoy</div>${offToday.length?`<div style="margin-top:6px;font-size:13px">${offToday.map(v=>`<div><span class="dot" style="background:${mColor(v.memberId)}"></span>${esc(mName(v.memberId))} <span class="muted" style="font-size:11px">(${isHX(v)?`Cambio de horas · ${esc(v.tStart||'')}–${esc(v.tEnd||'')}`:esc(v.type)+(v.end>t?` · hasta ${nice(v.end)}`:'')})</span></div>`).join('')}</div>`:''}</div>
     ${isEditor?`<div class="kpi"><div class="n">${S.members.length}</div><div class="l">Integrantes</div></div>`:myNextCard(t)}
     <div class="kpi"><div class="n" style="color:var(--warn)">${pend.length + (isEditor ? reqList().filter(reqNeedsAdmin).length : reqList().filter(r=>(reqMine(r)&&['Pendiente','Esperando compañero','Por aprobar'].includes(r.status))||reqIncoming(r)).length)}</div><div class="l">${isEditor?'Solicitudes pendientes':'Mis solicitudes en trámite'}</div></div>
   </div>
